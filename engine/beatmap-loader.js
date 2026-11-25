@@ -20,6 +20,7 @@ class BeatmapLoader {
    * Loads preloaded official tracks and all stored beatmaps from IndexedDB
    */
   async initDefaultBeatmaps() {
+    this.isLoading = true;
     // 1. Preload playable official track
     const defaultPaths = [
       "assets/osu-assets/osu.Game.Resources/Tracks/christmas2024.osz",
@@ -31,6 +32,7 @@ class BeatmapLoader {
         if (res.ok) {
           const buffer = await res.arrayBuffer();
           await this.importOsz(buffer);
+          if (this.onSetLoaded) this.onSetLoaded();
         }
       } catch (e) {
         console.warn("Could not preload " + p, e);

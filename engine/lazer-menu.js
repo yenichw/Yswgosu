@@ -275,6 +275,10 @@ class LazerUI {
     const activeOnline = onlineResults || (query ? this.currentOnlineResults : null);
 
     if (sets.length === 0 && (!activeOnline || activeOnline.length === 0)) {
+      if (this.loader.isLoading && !query) {
+        listPanel.innerHTML = '<div style="padding: 40px 24px; color: var(--accent-pink); text-align: center;"><div style="display: inline-block; width: 24px; height: 24px; border: 3px solid rgba(255, 102, 171, 0.3); border-top-color: #ff66ab; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px;"></div><div style="font-size: 1rem; font-weight: 600;">Loading beatmaps...</div></div>';
+        return;
+      }
       listPanel.innerHTML = `
         <div style="padding: 24px; color: var(--text-muted); text-align: center;">
           <p style="font-size: 1rem; color: #ffffff;">No local songs match "${filterQuery}"</p>
@@ -562,6 +566,14 @@ class LazerUI {
   // ===================================================================
   _bindEvents() {
     // 1. LET'S GO! button in Song Select
+    const btnWedgePlay = document.getElementById("btn-wedge-play");
+    if (btnWedgePlay) {
+      btnWedgePlay.addEventListener("click", (e) => {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        this.playCurrentBeatmap();
+      });
+    }
+
     const btnLetsGo = document.getElementById("btn-lets-go");
     if (btnLetsGo) {
       const handleLetsGo = (e) => {

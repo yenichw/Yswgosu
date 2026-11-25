@@ -81,6 +81,8 @@ canvas {
   display: flex;
   flex-direction: column;
   z-index: 1000;
+  background: radial-gradient(circle at 60% 40%, #1e132b 0%, #0c0814 100%) !important;
+  background-color: #0c0814 !important;
 }
 
 /* Background Blurred Cover Art */

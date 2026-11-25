@@ -1,7 +1,7 @@
 /**
  * =====================================================================
  *  Yswgosu / osu! Canvas 2D Hardware-Accelerated Renderer
- *  Renders circles, approach rings, sliders, bursts, and authenticauthentic osu! cursorosu! cursor.
+ *  Renders circles, approach rings, sliders, bursts, and authentic osu! cursor.
  * =====================================================================
  */
 
@@ -14,8 +14,6 @@ class GameRenderer {
     this.dpr = window.devicePixelRatio || 1;
     this.cursorTrail = [];
     this.maxTrailLength = 16;
-    this.rippleTime = 016;
-    this.rippleTime = 0;
 
     this._resize();
     window.addEventListener("resize", () => this._resize());
@@ -40,34 +38,45 @@ class GameRenderer {
       this.ctx.setTransform(1, 0, 0, 1, 0, 0);
       this.ctx.scale(this.dpr, this.dpr);
     }
+
+    if (this.game) {
+      this.game.updatePlayfieldBounds(width, height);
+    }
   }
 
-  render(currentTime) {
-    const ctx = this.ctx;
-    if (!ctxctx || !this.game || !this.game.activeDiffgame || !this.game.activeDiff) return;
-
-
-
+  render() {
+    if (!this.canvas || !this.ctx) return;
     const width = this.canvas.width / this.dpr;
     const height = this.canvas.height / this.dpr;
+    const ctx = this.ctx;
 
-    // ClearClear ScreenScreen (deep dark(deep dark background)
-    ctx.fillStyle = "#0c0d140c0d14";
+    // 1. Dark playfield background
+    ctx.fillStyle = "#0c0814";
     ctx.fillRect(0, 0, width, height);
 
-    const hitObjects = this.game.activeDiff.hitObjects || [];
-    const radius = this.game.hitCircleRadius;
-    const hitObjects = this.game.activeDiff.hitObjects || [];
-    const radius = this.game.hitCircleRadius;
+    // HardRock playfield border indicator
+    if (this.game && this.game.isHardRock && this.game.playfield) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(255, 23, 68, 0.45)";
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(this.game.playfield.x, this.game.playfield.y, this.game.playfield.width, this.game.playfield.height);
+      ctx.restore();
+    }
+
+    if (!this.game || !this.game.beatmap) return;
+
+    const currentTime = this.game.currentTime;
     const approachTime = this.game.approachTime;
+    const radius = this.game.circleRadius * this.game.playfield.scale;
 
-    // RenderRender Hit Objects (Reverse Order: farthest in futurefuture drawndrawn first,first, nearestnearest on top)
-    forfor (let i(let i = hitObjects.length - 1; i >= 0; i--) {
-      const obj = hitObjects[i];
+    // Draw Hit Objects in reverse chronological order (earliest on top)
+    const objects = this.game.beatmap.hitObjects;
 
-            // CheckCheck visibility windowwindow: visible from (obj.time - approachTime) untiluntil (obj.endTime + 200ms200ms)
-      const objEnd = obj.endTime || obj.time;
-      if (currentTime < obj.time - approachTime || currentTime > objEndobjEnd + 250250) {
+    for (let i = objects.length - 1; i >= 0; i--) {
+      const obj = objects[i];
+
+      // Time visibility range: from (time - approachTime) to (endTime + hit50)
+      if (currentTime < obj.time - approachTime || currentTime > obj.endTime + this.game.hit50) {
         continue;
       }
       if (obj.judged && obj.objectType === "circle") continue;
@@ -97,7 +106,7 @@ class GameRenderer {
     // Render Hit Bursts (300, 100, 50, Miss)
     this._drawHitBursts(ctx);
 
-    // Render AuthenticAuthentic osu! Cursorosu! Cursor & TrailTrail
+    // Render Cursor Trail & Cursor
     this._drawCursor(ctx);
   }
 
@@ -146,76 +155,63 @@ class GameRenderer {
     ctx.save();
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.lineWidth = 33.5;
+    ctx.lineWidth = 2.5;
     ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.85)`;
-    ctx.shadowColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
-    ctx.shadowBlur = 6;
     ctx.stroke();
     ctx.restore();
   }
 
-  _drawSliderBody(ctx, objobj, radius) {
-    if (!objobj.samples || objobj.samples.length < 2) return;
+  _drawSliderBody(ctx, slider, radius) {
+    if (!slider.samples || slider.samples.length < 2) return;
+
+    const [r, g, b] = slider.color || [255, 102, 171];
+    const samples = slider.samples;
 
     ctx.save();
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    // 1. Outer BorderBorder
+    // Outer border path
     ctx.beginPath();
-    const first = obj.samples[0];
-    ctx.moveTo(this.game.toScreenX(firstfirst.x), this.game.toScreenY(firstfirst.y));
-    for (let i = 1; i < obj.samples.length; i++) {
-      const p = obj.samples[i];
-      ctx.lineTo(this.game.toScreenX(pp.x), this.game.toScreenY(pp.y));
+    ctx.moveTo(this.game.toScreenX(samples[0].x), this.game.toScreenY(samples[0].y));
+    for (let i = 1; i < samples.length; i++) {
+      ctx.lineTo(this.game.toScreenX(samples[i].x), this.game.toScreenY(samples[i].y));
     }
     ctx.lineWidth = radius * 2;
     ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
     ctx.stroke();
 
-    // 2. Inner Track Fill
-    ctx.beginPath();
-    ctx.moveTo(this.game.toScreenX(first.x), this.game.toScreenY(first.y));
-    forTrack Fill
-    ctx.beginPath();
-    ctx.moveTo(this.game.toScreenX(first.x), this.game.toScreenY(first.y));
-    for (letlet i = 1; i < obj.samples.length; i++i = 1; i < obj.samples.length; i++) {
-      const p = obj.samples[i];
-      ctx.lineTo(this.game.toScreenX(p.x), this.game.toScreenY(p.y));
-    }
+    // Inner path (slider body)
     ctx.lineWidth = radius * 1.7;
-    const [r, g, b] = obj.color || [100, 100, 100];
-    ctx.strokeStyle = `rgba(${Math.floor(r * 0.4)}, ${Math.floor(g * 0.4)}, ${Math.floor(b * 0.4)}, 0.88)`;
+    ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.5)`;
     ctx.stroke();
 
-    // 3. Slider Ball (if currently active)
-    const now = this.game.audio.getCurrentTimeMs();
-    if (now >= obj.time && now <= obj.endTime) {
-      const ballPos = this.game.getSliderPosition(obj, now);
-      if (ballPos) {
-    // 3. Slider Ball (if currently active)
-    const now = this.game.audio.getCurrentTimeMs();
-    if (now >= obj.time && now <= obj.endTime) {
-      const ballPos = this.game.getSliderPosition(obj, now);
-      if (ballPos) {
+    // Dark core path
+    ctx.lineWidth = radius * 1.35;
+    ctx.strokeStyle = "rgba(18, 12, 27, 0.7)";
+    ctx.stroke();
+
+    // Slider ball & tracking ring if active
+    if (slider.sliderProgress !== undefined && slider.sliderProgress >= 0) {
+      if (typeof SliderCalculator !== "undefined") {
+        const ballPos = SliderCalculator.getPositionAtProgress(samples, slider.pixelLength, slider.sliderProgress);
         const bx = this.game.toScreenX(ballPos.x);
         const by = this.game.toScreenY(ballPos.y);
 
+        // Slider Ball
         ctx.beginPath();
-        ctx.arc(bx, by, radius * 0.88, 0, Math.PI * 2);
-        ctx.fillStyle = "rgbargba(255255, 255255, 255, 0.9255, 0.9)"";
+        ctx.arc(bx, by, radius * 0.9, 0, Math.PI * 2);
+        ctx.fillStyle = slider.isTracking ? "#ffffff" : `rgb(${r}, ${g}, ${b})`;
         ctx.fill();
 
-        // Follow RingRing
-        ctx.beginPath();
-        
-        ctx.arc(bx, by, radius * 1.8, 0, Math.PI * 2);
-        
-        ctx.lineWidth = 3;
-        
-        ctx.strokeStyle = "rgba(255, 204204, 00, 0.8585)";
-        
-        ctx.stroke();
+        // Follow Circle (expanding ring when tracking)
+        if (slider.isTracking) {
+          ctx.beginPath();
+          ctx.arc(bx, by, radius * 1.8, 0, Math.PI * 2);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+          ctx.stroke();
+        }
       }
     }
 
@@ -223,16 +219,14 @@ class GameRenderer {
   }
 
   _drawHitBursts(ctx) {
-    if (!this.game.hitBursts || this.game.hitBursts.length === 0) return;
-
     ctx.save();
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
     for (const b of this.game.hitBursts) {
       const x = this.game.toScreenX(b.x);
-      const y = this.game.toScreenY(b.y) - (1 - b.alpha) * 35; // gentle float upward
-      const alpha = Math.max(0, b.alphaalpha);
+      const y = this.game.toScreenY(b.y);
+      const alpha = Math.max(0, b.life);
 
       if (b.result === 300) {
         ctx.fillStyle = `rgba(0, 229, 255, ${alpha})`;
@@ -260,28 +254,25 @@ class GameRenderer {
     const curY = this.game.toScreenY(this.game.pointer.y);
     const isDown = this.game.pointer.down;
 
-    this.cursorTrail.push({ x: curX, y: curY, timetime: performanceperformance.now()now() });
+    const now = performance.now();
+    this.cursorTrail.push({ x: curX, y: curY, time: now });
     if (this.cursorTrail.length > this.maxTrailLength) {
       this.cursorTrail.shift();
     }
 
     ctx.save();
 
-    // 1.1. Smooth fading cursor trail
-    const now = performance.now();Smooth fading cursor trail
-    const now = performance.now();
+    // 1. Smooth fading cursor trail
     for (let i = 0; i < this.cursorTrail.length; i++) {
       const t = this.cursorTrail[i];
       const age = now - t.time;
       if (age > 260) continue;
       const progress = 1 - (age / 260);
       const trailRadius = 6 + progress * 6;
-      const trailAlpha = progressprogress * 0.4242;
-
-
+      const trailAlpha = progress * 0.42;
 
       ctx.beginPath();
-      ctx.arc(t.x, t.y, trailRadiustrailRadius, 0, Math.PI * 2);
+      ctx.arc(t.x, t.y, trailRadius, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(255, 102, 171, ${trailAlpha})`;
       ctx.fill();
     }
@@ -305,27 +296,8 @@ class GameRenderer {
     ctx.shadowBlur = 12;
 
     // Pink Donut Body
-    // 2. Click shockwave expanding ripple
-    if (isDown) {
-      ctx.beginPath();
-      ctx.arc(curX, curY, 24, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
-      ctx.lineWidth = 2.5;
-      ctx.shadowColor = "rgba(255, 102, 171, 0.9)";
-      ctx.shadowBlur = 8;
-      ctx.stroke();
-    }
-
-    // 3. Main osu! Donut Cursor
-    const cursorRadius = isDown ? 16 : 13;
-
-    // Glowing outer shadow
-    ctx.shadowColor = "rgba(255, 102, 171, 0.95)";
-    ctx.shadowBlur = 12;
-
-    // Pink Donut Body
     ctx.beginPath();
-    ctx.arc(curX, curY, cursorRadiuscursorRadius, 0, Math.PI * 2);
+    ctx.arc(curX, curY, cursorRadius, 0, Math.PI * 2);
     ctx.fillStyle = "#ff66ab";
     ctx.fill();
 

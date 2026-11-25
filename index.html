@@ -49,7 +49,7 @@
     window.isKosuOnMainMenu = function() {
       if (!window.KosuMain || !window.KosuMain.currentScreen) return false;
       const s = window.KosuMain.currentScreen;
-      return !!(s.osuCircle || (s.constructor && s.constructor.name === "N"));
+      return !!s.osuCircle;
     };
 
     // Neutralize persistent MediaSession so Android doesn't treat WebView as background music player
@@ -576,9 +576,8 @@
         window.openSongSelect();
       }
 
-      document.addEventListener("pointerdown", handleMainMenuClick, true);
-      document.addEventListener("click", handleMainMenuClick, true);
-      document.addEventListener("touchend", handleMainMenuClick, { passive: true, capture: true });
+      window.addEventListener("click", handleMainMenuClick);
+      window.addEventListener("touchend", handleMainMenuClick, { passive: true });
     })();
   </script>
 
