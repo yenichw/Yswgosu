@@ -28,13 +28,6 @@
 <table>
   <tr>
     <td width="50%">
-      <h3>🎮 1-to-1 Cross-Platform Parity</h3>
-      <ul>
-        <li><b>PC & Desktop Browsers:</b> Precision mouse tracking, keyboard streaming bindings (<kbd>Z</kbd> / <kbd>X</kbd> with auto-repeat suppression), <kbd>Esc</kbd> navigation, and authentic osu! cursor with fading trails and click shockwaves.</li>
-        <li><b>Android (exteraGram / Elyx):</b> Low-latency multi-touch support, system "Back" gesture & button integration, auto-pause on minimizing, and an ultra-compact footprint (~325 KB).</li>
-      </ul>
-    </td>
-    <td width="50%">
       <h3>⚡ Instant Beatmap Streaming & Downloads</h3>
       <ul>
         <li>Direct in-game search and instant <code>.osz</code> archive streaming downloads with live progress indicators.</li>
