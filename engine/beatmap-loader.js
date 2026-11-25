@@ -1,8 +1,9 @@
 /**
  * =====================================================================
- *  osu! Beatmap & Asset Loader
- *  Unpacks .osz archives in-memory using JSZip, decodes audio, parses .osu files,
- *  extracts background artwork, and manages persistent IndexedDB storage & online search.
+ *  Yswgosu / osu! Beatmap & Asset Loader
+ *  Unpacks .osz archives in-memory using JSZip, extracts background artwork,
+ *  streams audio instantly via HTML5 Blob URLs with background Web Audio decode,
+ *  and manages persistent IndexedDB storage & multi-mirror online downloads.
  * =====================================================================
  */
 
@@ -160,27 +161,14 @@ class BeatmapLoader {
       }, allAudioEntries[0]);
     }
 
-    // Extract audio blob & blob URL
+    // Extract audio blob & blob URL (Instant HTML5 playback)
     let audioBlobUrl = null;
-    let audioBuffer = null;
+    let pendingAudioBlob = null;
 
     if (audioFileEntry) {
       try {
-        const audioBlob = await audioFileEntry.async("blob");
-        audioBlobUrl = URL.createObjectURL(audioBlob);
-
-        // Attempt Web Audio decoding
-        if (this.audio && this.audio.ctx) {
-          try {
-            await this.audio.resume();
-            const audioArrayBuffer = await audioBlob.arrayBuffer();
-            audioBuffer = await new Promise((resolve, reject) => {
-              this.audio.ctx.decodeAudioData(audioArrayBuffer, resolve, reject);
-            }).catch(() => null);
-          } catch (e) {
-            console.warn("Web Audio decodeAudioData skipped or failed, using HTML5 audio blob:", e);
-          }
-        }
+        pendingAudioBlob = await audioFileEntry.async("blob");
+        audioBlobUrl = URL.createObjectURL(pendingAudioBlob);
       } catch (e) {
         console.warn("Could not extract audio from osz:", e);
       }
@@ -217,7 +205,7 @@ class BeatmapLoader {
 
     // Attach audio and background to all difficulties
     for (const diff of parsedDiffs) {
-      diff._audioBuffer = audioBuffer;
+      diff._audioBuffer = null;
       diff._audioBlobUrl = audioBlobUrl;
       diff._bgUrl = bgUrl;
     }
@@ -233,11 +221,23 @@ class BeatmapLoader {
       artist: meta.Artist || "Unknown Artist",
       creator: meta.Creator || "Unknown",
       bgUrl: bgUrl,
-      audioBuffer: audioBuffer,
+      audioBuffer: null,
       audioBlobUrl: audioBlobUrl,
       previewTime: previewTime,
       difficulties: parsedDiffs,
     };
+
+    // Non-blocking background decode for Web Audio buffer (keeps UI & audio instantly responsive on PC)
+    if (pendingAudioBlob && this.audio && this.audio.ctx) {
+      pendingAudioBlob.arrayBuffer().then(buf => {
+        this.audio.ctx.decodeAudioData(buf, (decoded) => {
+          newSet.audioBuffer = decoded;
+          for (const diff of parsedDiffs) {
+            diff._audioBuffer = decoded;
+          }
+        }, () => {});
+      }).catch(() => {});
+    }
 
     // Prevent duplicate sets with same title
     const existingIdx = this.beatmapSets.findIndex(s => s.title.toLowerCase() === newSet.title.toLowerCase());
@@ -260,7 +260,7 @@ class BeatmapLoader {
   }
 
   /**
-   * Search beatmap mirror online (catboy / mino via local proxy)
+   * Search beatmap mirrors online (osu.direct / sayobot / catboy)
    */
   async searchOnline(query) {
     if (!query || !query.trim()) return [];
@@ -271,7 +271,7 @@ class BeatmapLoader {
         const res = await fetch(`${apiBase}/api/search?q=${encodeURIComponent(query)}`);
         if (res.ok) {
           const list = await res.json();
-          if (Array.isArray(list)) return list;
+          if (Array.isArray(list) && list.length > 0) return list;
         }
       } catch (e) {
         console.warn("Local search proxy failed, falling back to direct:", e);
@@ -283,7 +283,7 @@ class BeatmapLoader {
       const res = await fetch(`https://osu.direct/api/v2/search?q=${encodeURIComponent(query)}`);
       if (res.ok) {
         const list = await res.json();
-        if (Array.isArray(list)) return list;
+        if (Array.isArray(list) && list.length > 0) return list;
       }
     } catch (e) {
       console.warn("osu.direct search failed, trying catboy:", e);
@@ -302,7 +302,7 @@ class BeatmapLoader {
   }
 
   /**
-   * Download .osz directly from mirror via local proxy and persist to IndexedDB
+   * Download .osz directly from mirror and persist to IndexedDB
    */
   async downloadOnlineSet(setId) {
     let arrayBuffer = null;
@@ -345,9 +345,18 @@ class BeatmapLoader {
 
     // Direct browser fallback 3: catboy
     if (!arrayBuffer) {
-      const res = await fetch(`https://catboy.best/d/${encodeURIComponent(setId)}`);
-      if (!res.ok) throw new Error("Download failed: " + res.statusText);
-      arrayBuffer = await res.arrayBuffer();
+      try {
+        const res = await fetch(`https://catboy.best/d/${encodeURIComponent(setId)}`);
+        if (res.ok) {
+          arrayBuffer = await res.arrayBuffer();
+        }
+      } catch (e) {
+        console.warn("catboy download failed:", e);
+      }
+    }
+
+    if (!arrayBuffer) {
+      throw new Error("Download failed: all mirrors unreachable");
     }
 
     const newSet = await this.importOsz(arrayBuffer);

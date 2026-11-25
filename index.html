@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>kosu!lazer</title>
+  <title>Yswgosu</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <link rel="icon" href="favicon.png">
   <link href="main.a37e724502caaf4a68ea.css" rel="stylesheet">
@@ -11,10 +11,11 @@
   <!-- Audio Interceptor & Dynamic API Base for Local + GitHub Pages -->
   <script>
     const _urlParams = new URLSearchParams(window.location.search);
+    const _hasExplicitPort = _urlParams.has("port") && _urlParams.get("port");
     window.LOCAL_PORT = _urlParams.get("port") || "28314";
-    window.API_BASE = (window.location.protocol.startsWith("http") && window.location.hostname !== "127.0.0.1" && window.location.hostname !== "localhost")
-      ? ("http://127.0.0.1:" + window.LOCAL_PORT)
-      : "";
+    // Only route to local server when running as an Android Telegram plugin (where ?port=XXXX is passed).
+    // On standalone PC browser / web, API_BASE is empty so browser uses direct CORS mirrors!
+    window.API_BASE = _hasExplicitPort ? ("http://127.0.0.1:" + window.LOCAL_PORT) : "";
     window.allAudioContexts = [];
     window.allAudioElements = [];
 
@@ -65,8 +66,7 @@
         try {
           el.onpause = null;
           el.pause();
-        } catch (e) {}
-      });
+        } catch (e) {}\n      });
     };
 
     window.resumeKosuAudio = function() {
@@ -194,7 +194,7 @@
         </button>
 
         <div class="lazer-brand-title">
-          <span class="lazer-dot"></span> song select
+          <span class="lazer-dot"></span> Yswgosu • song select
         </div>
 
         <div class="search-input-wrapper">
@@ -250,83 +250,37 @@
           <div style="padding: 24px; text-align: center; color: var(--accent-pink);">Loading tracks...</div>
         </div>
       </div>
-
-      <!-- Footer with Mod Selector and LET'S GO! Button -->
-      <div class="song-select-footer">
-        <div class="mods-group">
-          <button class="btn-mod" id="btn-mod-auto" title="Watch Bot Play">AUTO</button>
-          <button class="btn-mod mod-nf" id="btn-mod-nf" title="No Fail">NoFail</button>
-          <button class="btn-mod mod-hr" id="btn-mod-hr" title="Hard Rock">HardRock</button>
-        </div>
-
-        <button class="btn-lets-go" id="btn-lets-go">
-          <span class="btn-lets-go-text">▶ LET'S GO!</span>
-        </button>
-      </div>
     </div>
 
     <!-- =====================================================================
-     *  SCREEN 3: GAMEPLAY (The actual rhythm game!)
+     *  SCREEN 3: GAMEPLAY SCREEN
      * ===================================================================== -->
     <div id="gameplay-screen" class="screen">
-      <canvas id="gameplay-canvas"></canvas>
-
-      <!-- HUD Overlay -->
-      <div class="game-hud">
-        <div class="hud-top">
-          <div class="hp-bar-container">
-            <div class="hp-bar-fill" id="hud-hp-fill" style="width: 100%;"></div>
-          </div>
-
-          <!-- Active Mods Indicator in HUD -->
-          <div class="hud-mods-display" id="hud-mods-display">
-            <span class="hud-mod-badge auto" id="hud-badge-auto" style="display: none;">AUTO</span>
-            <span class="hud-mod-badge nf" id="hud-badge-nf" style="display: none;">NF</span>
-            <span class="hud-mod-badge hr" id="hud-badge-hr" style="display: none;">HR</span>
-          </div>
-
-          <div class="hud-score-box">
-            <div class="hud-score" id="hud-score">00000000</div>
-            <div class="hud-accuracy" id="hud-accuracy">100.00%</div>
-          </div>
-        </div>
-
-        <div class="hud-bottom">
-          <div class="hud-combo-box">
-            <span class="hud-combo" id="hud-combo">0</span>
-            <span class="hud-combo-x">x</span>
-          </div>
-
-          <div style="display: flex; gap: 8px;">
-            <button class="hud-pause-btn" id="hud-pause-btn">Pause</button>
-            <button class="hud-pause-btn" id="hud-exit-btn" style="background: rgba(255, 23, 68, 0.45); border-color: rgba(255, 23, 68, 0.8);">Exit</button>
-          </div>
-        </div>
+      <div class="hud-top">
+        <div class="score-display" id="hud-score">0000000</div>
+        <div class="accuracy-display" id="hud-accuracy">100.00%</div>
       </div>
 
-      <!-- Fail Overlay (When HP drops to 0 and NoFail is off) -->
-      <div id="gameplay-fail-overlay" class="game-fail-overlay" style="display: none;">
-        <div class="fail-modal">
-          <div class="fail-grade">✕</div>
-          <div class="fail-title">FAILED</div>
-          <div class="fail-subtitle">Don't give up! Try again or enable NoFail.</div>
-          <div class="fail-actions">
-            <button class="btn-lazer primary" id="btn-fail-retry">Retry</button>
-            <button class="btn-lazer" id="btn-fail-quit">Song Select</button>
-          </div>
-        </div>
+      <div class="hud-hp-bar-container">
+        <div class="hud-hp-fill" id="hud-hp-fill"></div>
       </div>
+
+      <div class="hud-bottom-left">
+        <div class="combo-counter" id="hud-combo">0x</div>
+      </div>
+
+      <canvas id="gameplay-canvas" class="gameplay-canvas"></canvas>
     </div>
 
     <!-- =====================================================================
-     *  SCREEN 4: RESULTS
+     *  SCREEN 4: RESULTS SCREEN
      * ===================================================================== -->
     <div id="results-screen" class="screen">
-      <div class="results-modal">
+      <div class="results-card">
         <div class="results-header">
           <div>
-            <h2 style="font-size: 1.8rem; font-weight: 800;">Results</h2>
-            <div style="color: var(--text-secondary); margin-top: 4px;" id="res-title">Track Info</div>
+            <div class="results-title" id="res-title">Song Title</div>
+            <div class="results-artist" id="res-artist">Artist Name</div>
           </div>
           <div class="results-grade-badge grade-s" id="res-grade">S</div>
         </div>
@@ -364,17 +318,193 @@
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Authentic osu! Closing Screen ("see you next time...") -->
-    <div id="exit-overlay" class="exit-overlay" style="display: none;">
-      <div class="exit-modal">
-        <div class="exit-osu-logo">osu!</div>
-        <div class="exit-text">see you next time...</div>
-      </div>
+  <!-- Authentic osu! Closing Screen ("see you next time...") -->
+  <div id="exit-overlay" class="exit-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999999;">
+    <div class="exit-modal">
+      <div class="exit-osu-logo">osu!</div>
+      <div class="exit-text">see you next time...</div>
     </div>
   </div>
 
+  <!-- Authentic osu! Cursor & Trail (Active on PC Mouse / Pointer) -->
+  <div id="osu-cursor-container">
+    <div id="osu-cursor-body"></div>
+  </div>
 
+  <style>
+    @media (pointer: fine) {
+      *, *::before, *::after {
+        cursor: none !important;
+      }
+      #osu-cursor-container {
+        display: block !important;
+      }
+    }
+    #osu-cursor-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 2147483647;
+      overflow: hidden;
+      display: none;
+    }
+    .osu-trail-dot {
+      position: absolute;
+      border-radius: 50%;
+      background: #ff66ab;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      opacity: 0.55;
+      transition: opacity 0.22s ease-out, transform 0.22s ease-out;
+      will-change: transform, opacity;
+    }
+    #osu-cursor-body {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #ff66ab;
+      border: 3px solid #ffffff;
+      box-shadow: 0 0 12px rgba(255, 102, 171, 0.95), 0 0 4px rgba(255, 255, 255, 0.8);
+      pointer-events: none;
+      transform: translate(-50%, -50%) scale(1);
+      transition: transform 0.06s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+      will-change: transform;
+      top: -100px;
+      left: -100px;
+    }
+    #osu-cursor-body::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 6px;
+      height: 6px;
+      background: #ffffff;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 3px #ffffff;
+    }
+    #osu-cursor-body.active {
+      transform: translate(-50%, -50%) scale(1.28);
+      box-shadow: 0 0 20px rgba(255, 102, 171, 1), 0 0 10px rgba(255, 255, 255, 0.9);
+    }
+    .osu-shockwave-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      box-shadow: 0 0 10px rgba(255, 102, 171, 0.8);
+      pointer-events: none;
+      transform: translate(-50%, -50%) scale(0.6);
+      animation: osu-shockwave 0.35s ease-out forwards;
+    }
+    @keyframes osu-shockwave {
+      0% {
+        transform: translate(-50%, -50%) scale(0.6);
+        opacity: 0.9;
+      }
+      100% {
+        transform: translate(-50%, -50%) scale(2.6);
+        opacity: 0;
+      }
+    }
+  </style>
+
+  <script>
+    (function initOsuCursor() {
+      const cursorBody = document.getElementById("osu-cursor-body");
+      const cursorContainer = document.getElementById("osu-cursor-container");
+      if (!cursorBody || !cursorContainer) return;
+
+      let lastX = -100;
+      let lastY = -100;
+      let lastTrailTime = 0;
+
+      function spawnShockwave(x, y) {
+        const ring = document.createElement("div");
+        ring.className = "osu-shockwave-ring";
+        ring.style.left = x + "px";
+        ring.style.top = y + "px";
+        ring.style.width = "40px";
+        ring.style.height = "40px";
+        cursorContainer.appendChild(ring);
+        setTimeout(() => ring.remove(), 360);
+      }
+
+      function spawnTrail(x, y) {
+        const now = performance.now();
+        if (now - lastTrailTime < 16) return;
+        lastTrailTime = now;
+
+        const dot = document.createElement("div");
+        dot.className = "osu-trail-dot";
+        dot.style.left = x + "px";
+        dot.style.top = y + "px";
+        dot.style.width = "16px";
+        dot.style.height = "16px";
+        cursorContainer.appendChild(dot);
+
+        requestAnimationFrame(() => {
+          dot.style.opacity = "0";
+          dot.style.transform = "translate(-50%, -50%) scale(0.35)";
+        });
+
+        setTimeout(() => dot.remove(), 240);
+      }
+
+      window.addEventListener("pointermove", (e) => {
+        if (e.pointerType === "touch") {
+          cursorContainer.style.display = "none";
+          return;
+        }
+        cursorContainer.style.display = "block";
+        lastX = e.clientX;
+        lastY = e.clientY;
+        cursorBody.style.left = lastX + "px";
+        cursorBody.style.top = lastY + "px";
+        spawnTrail(lastX, lastY);
+      }, { passive: true });
+
+      window.addEventListener("pointerdown", (e) => {
+        if (e.pointerType === "touch") return;
+        cursorBody.classList.add("active");
+        spawnShockwave(e.clientX, e.clientY);
+      }, { passive: true });
+
+      window.addEventListener("pointerup", (e) => {
+        if (e.pointerType === "touch") return;
+        cursorBody.classList.remove("active");
+      }, { passive: true });
+
+      // Keyboard taps (Z, X keys in osu!)
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "KeyZ" || e.code === "KeyX") {
+          cursorBody.classList.add("active");
+          if (lastX > 0 && lastY > 0) {
+            spawnShockwave(lastX, lastY);
+          }
+        }
+      });
+
+      window.addEventListener("keyup", (e) => {
+        if (e.code === "KeyZ" || e.code === "KeyX") {
+          cursorBody.classList.remove("active");
+        }
+      });
+
+      document.addEventListener("mouseleave", () => {
+        cursorBody.style.opacity = "0";
+      });
+      document.addEventListener("mouseenter", () => {
+        cursorBody.style.opacity = "1";
+      });
+    })();
+  </script>
 
   <!-- Local Rhythm Game Engine Scripts -->
   <script src="engine/jszip.min.js"></script>
