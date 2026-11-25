@@ -1,0 +1,535 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>kosu!lazer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <link rel="icon" href="favicon.png">
+  <link href="main.a37e724502caaf4a68ea.css" rel="stylesheet">
+  <link href="engine/game-ui.css" rel="stylesheet">
+
+  <!-- Audio Interceptor & Dynamic API Base for Local + GitHub Pages -->
+  <script>
+    const _urlParams = new URLSearchParams(window.location.search);
+    window.LOCAL_PORT = _urlParams.get("port") || "28314";
+    window.API_BASE = (window.location.protocol.startsWith("http") && window.location.hostname !== "127.0.0.1" && window.location.hostname !== "localhost")
+      ? ("http://127.0.0.1:" + window.LOCAL_PORT)
+      : "";
+    window.allAudioContexts = [];
+    window.allAudioElements = [];
+
+    // Neutralize persistent MediaSession so Android doesn't treat WebView as background music player
+    try {
+      if (navigator.mediaSession) {
+        navigator.mediaSession.setActionHandler = function() {};
+        navigator.mediaSession.metadata = null;
+      }
+    } catch (e) {}
+
+    const OrigAudioContext = window.AudioContext || window.webkitAudioContext;
+    if (OrigAudioContext) {
+      window.AudioContext = function(...args) {
+        const ctx = new OrigAudioContext(...args);
+        window.allAudioContexts.push(ctx);
+        return ctx;
+      };
+      window.AudioContext.prototype = OrigAudioContext.prototype;
+      if (window.webkitAudioContext) {
+        window.webkitAudioContext = window.AudioContext;
+      }
+    }
+
+    const origCreateElement = document.createElement;
+    document.createElement = function(tag, ...args) {
+      const el = origCreateElement.call(document, tag, ...args);
+      if (tag && tag.toLowerCase() === "audio") {
+        window.allAudioElements.push(el);
+      }
+      return el;
+    };
+
+    window.pauseKosuAudio = function() {
+      try {
+        if (window.KosuMain && window.KosuMain.AudioEngine) {
+          const music = window.KosuMain.AudioEngine.GetCurrentPlayingMusicNoSilent();
+          if (music) {
+            music.Pause();
+            if (music.mediaAudioElement) {
+              music.mediaAudioElement.pause();
+            }
+          }
+        }
+      } catch (e) {}
+
+      window.allAudioElements.forEach(el => {
+        try {
+          el.onpause = null;
+          el.pause();
+        } catch (e) {}
+      });
+    };
+
+    window.resumeKosuAudio = function() {
+      try {
+        if (window.KosuMain && window.KosuMain.AudioEngine) {
+          const music = window.KosuMain.AudioEngine.GetCurrentPlayingMusicNoSilent();
+          if (music) {
+            music.Play();
+          }
+        }
+      } catch (e) {}
+    };
+
+    window.pauseAllAudio = function() {
+      window.pauseKosuAudio();
+
+      window.allAudioContexts.forEach(ctx => {
+        try {
+          if (ctx.state === "running") ctx.suspend();
+        } catch (e) {}
+      });
+
+      if (window.AudioEngineInstance) {
+        try {
+          window.AudioEngineInstance.pauseTrack();
+        } catch (e) {}
+      }
+    };
+
+    window.resumeAllAudio = function() {
+      window.allAudioContexts.forEach(ctx => {
+        try {
+          if (ctx.state === "suspended") ctx.resume();
+        } catch (e) {}
+      });
+
+      const container = document.getElementById("app-container");
+      if (container && container.style.display === "flex") {
+        if (window.AudioEngineInstance && window.AudioEngineInstance.isPaused) {
+          window.AudioEngineInstance.resumeTrack();
+        }
+      } else {
+        window.resumeKosuAudio();
+      }
+    };
+
+    window.stopAllAudio = function() {
+      try {
+        if (window.KosuMain && window.KosuMain.AudioEngine) {
+          const music = window.KosuMain.AudioEngine.GetCurrentPlayingMusicNoSilent();
+          if (music) {
+            music.Pause();
+            if (music.mediaAudioElement) {
+              music.mediaAudioElement.onpause = null;
+              music.mediaAudioElement.pause();
+              music.mediaAudioElement.src = "";
+              music.mediaAudioElement.load();
+            }
+          }
+          if (window.KosuMain.AudioEngine.audioContext) {
+            window.KosuMain.AudioEngine.audioContext.close();
+          }
+        }
+      } catch (e) {}
+
+      window.allAudioElements.forEach(el => {
+        try {
+          el.onpause = null;
+          el.pause();
+          el.currentTime = 0;
+          el.src = "";
+          el.load();
+        } catch (e) {}
+      });
+
+      window.allAudioContexts.forEach(ctx => {
+        try {
+          if (ctx.state !== "closed") ctx.close();
+        } catch (e) {}
+      });
+
+      if (window.AudioEngineInstance) {
+        try {
+          window.AudioEngineInstance.stopTrack();
+          if (window.AudioEngineInstance.ctx) {
+            window.AudioEngineInstance.ctx.close();
+          }
+        } catch (e) {}
+      }
+    };
+
+    // Auto pause/resume when Telegram / WebView loses focus or is minimized
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        window.pauseAllAudio();
+      } else {
+        window.resumeAllAudio();
+      }
+    });
+    window.addEventListener("pagehide", () => window.stopAllAudio());
+    window.addEventListener("beforeunload", () => window.stopAllAudio());
+  </script>
+
+  <!-- Kosu PixiJS Intro & Menu scripts -->
+  <script defer="defer" src="game.889ecd15265eebce4617.js"></script>
+  <script defer="defer" src="game.d5d4511cc3321d5b7d1f.js"></script>
+</head>
+<body>
+
+  <!-- Game and Song Select UI Container -->
+  <div id="app-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; display: none;">
+    <div id="screen-bg-image" class="screen-bg-image"></div>
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- =====================================================================
+     *  SCREEN 2: SONG SELECT
+     * ===================================================================== -->
+    <div id="song-select-screen" class="screen active">
+      <div class="song-select-header">
+        <button class="btn-icon" id="btn-back-to-menu" title="Back to osu! menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+        </button>
+
+        <div class="lazer-brand-title">
+          <span class="lazer-dot"></span> song select
+        </div>
+
+        <div class="search-input-wrapper">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="search-input" class="search-input" placeholder="Search songs (press Enter for online)...">
+          <button id="search-clear-btn" class="search-clear-btn" style="display: none;">✕</button>
+        </div>
+        <button class="btn-lazer" id="btn-search-online" title="Search online beatmaps" style="padding: 6px 14px; font-size: 0.82rem; margin-left: 8px; cursor: pointer;">
+          🌐 Online
+        </button>
+      </div>
+
+      <div class="song-select-content">
+        <!-- Left: Selected Beatmap Details (The Wedge) -->
+        <div class="beatmap-details-panel">
+          <div class="beatmap-banner" id="detail-banner">
+            <div class="beatmap-banner-overlay">
+              <span class="star-rating-pill diff-hard" id="detail-star">★ 4.2</span>
+            </div>
+          </div>
+
+          <div>
+            <div class="beatmap-meta-title" id="detail-title">Loading beatmaps...</div>
+            <div class="beatmap-meta-artist" id="detail-artist">Please wait</div>
+            <div class="beatmap-meta-creator" id="detail-creator">Mapped by osu! team</div>
+          </div>
+
+          <div class="beatmap-stats-grid">
+            <div class="stat-item">
+              <span class="stat-label">Circle Size</span>
+              <span class="stat-value" id="stat-cs">4.0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Approach Rate</span>
+              <span class="stat-value" id="stat-ar">6.0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Overall Diff</span>
+              <span class="stat-value" id="stat-od">5.0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">HP Drain</span>
+              <span class="stat-value" id="stat-hp">5.0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Scrollable Beatmap Carousel -->
+        <div class="beatmap-list-panel" id="beatmap-list">
+          <div style="padding: 24px; text-align: center; color: var(--accent-pink);">Loading tracks...</div>
+        </div>
+      </div>
+
+      <!-- Footer with Mod Selector and LET'S GO! Button -->
+      <div class="song-select-footer">
+        <div class="mods-group">
+          <button class="btn-mod" id="btn-mod-auto" title="Watch Bot Play">AUTO</button>
+          <button class="btn-mod mod-nf" id="btn-mod-nf" title="No Fail">NoFail</button>
+          <button class="btn-mod mod-hr" id="btn-mod-hr" title="Hard Rock">HardRock</button>
+        </div>
+
+        <button class="btn-lets-go" id="btn-lets-go">
+          <span class="btn-lets-go-text">▶ LET'S GO!</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- =====================================================================
+     *  SCREEN 3: GAMEPLAY (The actual rhythm game!)
+     * ===================================================================== -->
+    <div id="gameplay-screen" class="screen">
+      <canvas id="gameplay-canvas"></canvas>
+
+      <!-- HUD Overlay -->
+      <div class="game-hud">
+        <div class="hud-top">
+          <div class="hp-bar-container">
+            <div class="hp-bar-fill" id="hud-hp-fill" style="width: 100%;"></div>
+          </div>
+
+          <!-- Active Mods Indicator in HUD -->
+          <div class="hud-mods-display" id="hud-mods-display">
+            <span class="hud-mod-badge auto" id="hud-badge-auto" style="display: none;">AUTO</span>
+            <span class="hud-mod-badge nf" id="hud-badge-nf" style="display: none;">NF</span>
+            <span class="hud-mod-badge hr" id="hud-badge-hr" style="display: none;">HR</span>
+          </div>
+
+          <div class="hud-score-box">
+            <div class="hud-score" id="hud-score">00000000</div>
+            <div class="hud-accuracy" id="hud-accuracy">100.00%</div>
+          </div>
+        </div>
+
+        <div class="hud-bottom">
+          <div class="hud-combo-box">
+            <span class="hud-combo" id="hud-combo">0</span>
+            <span class="hud-combo-x">x</span>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button class="hud-pause-btn" id="hud-pause-btn">Pause</button>
+            <button class="hud-pause-btn" id="hud-exit-btn" style="background: rgba(255, 23, 68, 0.45); border-color: rgba(255, 23, 68, 0.8);">Exit</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fail Overlay (When HP drops to 0 and NoFail is off) -->
+      <div id="gameplay-fail-overlay" class="game-fail-overlay" style="display: none;">
+        <div class="fail-modal">
+          <div class="fail-grade">✕</div>
+          <div class="fail-title">FAILED</div>
+          <div class="fail-subtitle">Don't give up! Try again or enable NoFail.</div>
+          <div class="fail-actions">
+            <button class="btn-lazer primary" id="btn-fail-retry">Retry</button>
+            <button class="btn-lazer" id="btn-fail-quit">Song Select</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =====================================================================
+     *  SCREEN 4: RESULTS
+     * ===================================================================== -->
+    <div id="results-screen" class="screen">
+      <div class="results-modal">
+        <div class="results-header">
+          <div>
+            <h2 style="font-size: 1.8rem; font-weight: 800;">Results</h2>
+            <div style="color: var(--text-secondary); margin-top: 4px;" id="res-title">Track Info</div>
+          </div>
+          <div class="results-grade-badge grade-s" id="res-grade">S</div>
+        </div>
+
+        <div class="results-stats-grid">
+          <div class="result-stat-box">
+            <span class="result-stat-label">Total Score</span>
+            <span class="result-stat-val" id="res-score" style="color: var(--accent-cyan);">0</span>
+          </div>
+          <div class="result-stat-box">
+            <span class="result-stat-label">Accuracy</span>
+            <span class="result-stat-val" id="res-acc" style="color: var(--accent-pink);">100%</span>
+          </div>
+          <div class="result-stat-box">
+            <span class="result-stat-label">Max Combo</span>
+            <span class="result-stat-val" id="res-combo" style="color: var(--accent-gold);">0x</span>
+          </div>
+          <div class="result-stat-box">
+            <span class="result-stat-label">300 / 100 / 50</span>
+            <span class="result-stat-val" style="font-size: 1rem;">
+              <span id="res-300" style="color: var(--accent-cyan);">0</span> /
+              <span id="res-100" style="color: var(--accent-green);">0</span> /
+              <span id="res-50"  style="color: var(--accent-gold);">0</span>
+            </span>
+          </div>
+          <div class="result-stat-box" style="grid-column: span 2;">
+            <span class="result-stat-label">Misses</span>
+            <span class="result-stat-val" id="res-miss" style="color: var(--accent-red);">0</span>
+          </div>
+        </div>
+
+        <div class="results-actions">
+          <button class="btn-lazer" id="btn-results-back">Song Select</button>
+          <button class="btn-lazer primary" id="btn-results-retry">Retry</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Authentic osu! Closing Screen ("see you next time...") -->
+    <div id="exit-overlay" class="exit-overlay" style="display: none;">
+      <div class="exit-modal">
+        <div class="exit-osu-logo">osu!</div>
+        <div class="exit-text">see you next time...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Persistent Main Menu Exit Button (visible only when in Kosu Main Menu) -->
+  <div id="main-menu-exit-bar" style="position: fixed; bottom: 16px; left: 16px; z-index: 100; display: flex; align-items: center; gap: 8px;">
+    <button id="btn-main-exit" style="background: rgba(20, 16, 28, 0.75); border: 1px solid rgba(255, 102, 171, 0.4); border-radius: 20px; color: #ffffff; padding: 7px 18px; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 7px; backdrop-filter: blur(8px); box-shadow: 0 4px 14px rgba(0,0,0,0.4); transition: transform 0.15s ease;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+      <span>Exit</span>
+    </button>
+  </div>
+
+  <!-- Local Rhythm Game Engine Scripts -->
+  <script src="engine/jszip.min.js"></script>
+  <script src="engine/slider-calc.js"></script>
+  <script src="engine/beatmap-parser.js"></script>
+  <script src="engine/audio-engine.js"></script>
+  <script src="engine/gameplay.js"></script>
+  <script src="engine/renderer.js"></script>
+  <script src="engine/beatmap-storage.js"></script>
+  <script src="engine/beatmap-loader.js"></script>
+  <script src="engine/lazer-menu.js"></script>
+
+  <script>
+    window.addEventListener("DOMContentLoaded", async () => {
+      const container = document.getElementById("app-container");
+      const btnBackToMenu = document.getElementById("btn-back-to-menu");
+
+      const gameplayCanvas = document.getElementById("gameplay-canvas");
+      const audio = new AudioEngine();
+      window.AudioEngineInstance = audio;
+
+      const gameplay = new GameplayEngine(audio);
+      const renderer = new GameRenderer(gameplayCanvas, gameplay);
+      const loader = new BeatmapLoader(audio);
+      const ui = new LazerUI(audio, gameplay, renderer, loader);
+      window.lazerUI = ui;
+
+      const mainExitBar = document.getElementById("main-menu-exit-bar");
+      const btnMainExit = document.getElementById("btn-main-exit");
+
+      function openSongSelect() {
+        if (container.style.display === "flex") return;
+        window.pauseKosuAudio();
+        audio.resume();
+        container.style.display = "flex";
+        if (mainExitBar) mainExitBar.style.display = "none";
+        ui.switchScreen("songSelect");
+      }
+
+      function backToMainMenu(e) {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        if (gameplay && gameplay.isRunning) {
+          gameplay.stop();
+          ui.switchScreen("songSelect");
+          return;
+        }
+
+        // Return from Song Select back to the osu! Main Menu
+        container.style.display = "none";
+        const screenBg = document.getElementById("screen-bg-image");
+        if (screenBg) screenBg.style.backgroundImage = "none";
+
+        if (mainExitBar) mainExitBar.style.display = "flex";
+        if (window.AudioEngineInstance) {
+          window.AudioEngineInstance.stopTrack();
+        }
+        if (window.resumeKosuAudio) {
+          window.resumeKosuAudio();
+        }
+
+        try {
+          if (window.KosuMain && window.KosuMain.currentScreen && window.KosuMain.currentScreen.bg) {
+            window.KosuMain.currentScreen.bg.newRandomBG();
+          }
+        } catch (err) {}
+      }
+
+      // 1. Hook into Kosu's PixiJS osu! logo click
+      window.onOsuLogoClicked = openSongSelect;
+
+      // 2. Click handler on canvas center (where the pulsating osu! logo is rendered)
+      function handleCanvasClick(e) {
+        if (container.style.display === "flex") return;
+        // Verify we are on the osu! Main Menu screen (screen with osuCircle or class N)
+        const isMainMenu = window.KosuMain && window.KosuMain.currentScreen && (
+          window.KosuMain.currentScreen.osuCircle ||
+          window.KosuMain.currentScreen.constructor.name === "N"
+        );
+        if (!isMainMenu) return;
+
+        // Check if tap was near the central osu! logo
+        const cx = window.innerWidth / 2;
+        const cy = window.innerHeight / 2;
+        const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
+        const logoRadius = Math.min(window.innerWidth, window.innerHeight) * 0.35;
+        if (dist <= logoRadius) {
+          openSongSelect();
+        }
+      }
+
+      window.addEventListener("click", handleCanvasClick);
+      window.addEventListener("touchend", handleCanvasClick, { passive: true });
+
+      // Authentic osu! exit sequence ("see you next time...")
+      window.triggerExitSequence = function() {
+        const overlay = document.getElementById("exit-overlay");
+        if (overlay) overlay.style.display = "flex";
+
+        if (window.AudioEngineInstance) {
+          try { window.AudioEngineInstance.stopTrack(); } catch (e) {}
+        }
+        if (window.pauseKosuAudio) {
+          window.pauseKosuAudio();
+        }
+
+        try {
+          const seeyaAudio = new Audio("seeya.mp3");
+          seeyaAudio.volume = 1.0;
+          seeyaAudio.play().catch(() => {});
+        } catch (e) {}
+
+        setTimeout(() => {
+          if (window.stopAllAudio) window.stopAllAudio();
+          const exitUrl = (window.API_BASE || "") + "/api/exit";
+          fetch(exitUrl).catch(() => {});
+        }, 1100);
+      };
+
+      if (btnMainExit) {
+        btnMainExit.addEventListener("click", (e) => {
+          e.stopPropagation();
+          window.triggerExitSequence();
+        });
+      }
+
+      // Back arrow in Song Select returns to Main Menu
+      btnBackToMenu.addEventListener("click", backToMainMenu);
+      btnBackToMenu.addEventListener("pointerdown", backToMainMenu);
+      btnBackToMenu.addEventListener("touchend", backToMainMenu);
+
+      window.handleAndroidBack = function() {
+        if (container.style.display === "flex") {
+          backToMainMenu();
+        } else {
+          window.triggerExitSequence();
+        }
+      };
+
+      // Load the 2 official tracks
+      try {
+        await loader.initDefaultBeatmaps();
+        ui.refreshSongList();
+      } catch (e) {
+        console.warn("Failed to load tracks:", e);
+      }
+    });
+  </script>
+</body>
+</html>
