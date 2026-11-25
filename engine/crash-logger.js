@@ -141,10 +141,27 @@
 
   // Hook global unhandled errors
   window.addEventListener("error", (e) => {
+    const msg = String(e.error || e.message || "");
+    if (msg.includes("ResizeObserver loop") || msg.includes("AudioContext")) {
+      logEvent("WARN", "RUNTIME", msg);
+      return;
+    }
     showCrashModal(e.error || e.message, `Uncaught Exception (${e.filename || "inline"}:${e.lineno || 0})`);
   });
 
   window.addEventListener("unhandledrejection", (e) => {
+    const reason = e.reason;
+    const msg = reason ? (reason.message || String(reason)) : "";
+    if (
+      msg.includes("AudioContext") ||
+      msg.includes("play()") ||
+      msg.includes("interrupted") ||
+      msg.includes("user didn't interact") ||
+      msg.includes("The operation was aborted")
+    ) {
+      logEvent("WARN", "AUDIO", `Audio minor warning: ${msg}`);
+      return;
+    }
     showCrashModal(e.reason, "Unhandled Promise Rejection");
   });
 

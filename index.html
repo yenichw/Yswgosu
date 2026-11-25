@@ -126,7 +126,9 @@
 
       window.allAudioContexts.forEach(ctx => {
         try {
-          if (ctx.state === "running") ctx.suspend();
+          if (ctx && ctx.state === "running") {
+            ctx.suspend().catch(() => {});
+          }
         } catch (e) {}
       });
 
@@ -140,7 +142,9 @@
     window.resumeAllAudio = function() {
       window.allAudioContexts.forEach(ctx => {
         try {
-          if (ctx.state === "suspended") ctx.resume();
+          if (ctx && ctx.state === "suspended") {
+            ctx.resume().catch(() => {});
+          }
         } catch (e) {}
       });
 
@@ -168,7 +172,11 @@
             }
           }
           if (window.KosuMain.AudioEngine.audioContext) {
-            window.KosuMain.AudioEngine.audioContext.close();
+            try {
+              if (window.KosuMain.AudioEngine.audioContext.state !== "closed") {
+                window.KosuMain.AudioEngine.audioContext.close().catch(() => {});
+              }
+            } catch (e) {}
           }
         }
       } catch (e) {}
@@ -183,17 +191,25 @@
         } catch (e) {}
       });
 
+      const closedSet = new Set();
       window.allAudioContexts.forEach(ctx => {
+        if (!ctx || closedSet.has(ctx)) return;
+        closedSet.add(ctx);
         try {
-          if (ctx.state !== "closed") ctx.close();
+          if (ctx.state !== "closed") {
+            ctx.close().catch(() => {});
+          }
         } catch (e) {}
       });
 
       if (window.AudioEngineInstance) {
         try {
           window.AudioEngineInstance.stopTrack();
-          if (window.AudioEngineInstance.ctx) {
-            window.AudioEngineInstance.ctx.close();
+          if (window.AudioEngineInstance.ctx && !closedSet.has(window.AudioEngineInstance.ctx)) {
+            closedSet.add(window.AudioEngineInstance.ctx);
+            if (window.AudioEngineInstance.ctx.state !== "closed") {
+              window.AudioEngineInstance.ctx.close().catch(() => {});
+            }
           }
         } catch (e) {}
       }
