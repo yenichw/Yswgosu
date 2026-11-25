@@ -742,6 +742,22 @@ class LazerUI {
     }
 
     // 7. Gameplay Callbacks
+        const btnFailRetry = document.getElementById("btn-fail-retry");
+    if (btnFailRetry) {
+      btnFailRetry.addEventListener("click", () => {
+        if (this.failOverlay) this.failOverlay.style.display = "none";
+        this.playCurrentBeatmap();
+      });
+    }
+
+    const btnFailBack = document.getElementById("btn-fail-back");
+    if (btnFailBack) {
+      btnFailBack.addEventListener("click", () => {
+        if (this.failOverlay) this.failOverlay.style.display = "none";
+        this.switchScreen("songSelect");
+      });
+    }
+
     this.game.onGameFail = () => {
       if (this.failOverlay) this.failOverlay.style.display = "flex";
     };
@@ -821,6 +837,8 @@ class LazerUI {
 
       if (this.game.isRunning) {
         this.game.update(delta);
+      }
+      if (this.screens.gameplay && this.screens.gameplay.classList.contains("active")) {
         this.renderer.render();
       }
 

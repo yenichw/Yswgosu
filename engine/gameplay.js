@@ -514,7 +514,7 @@ class GameplayEngine {
       this.combo = 0;
 
       if (!this.isNoFail && !this.isAuto) {
-        const missPenalty = this.isHardRock ? 0.14 : 0.09;
+        const missPenalty = this.isHardRock ? 0.08 : 0.04;
         this.hp -= missPenalty;
         if (this.hp <= 0) {
           this.hp = 0;

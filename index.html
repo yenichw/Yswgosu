@@ -306,21 +306,34 @@
     <!-- =====================================================================
      *  SCREEN 3: GAMEPLAY SCREEN
      * ===================================================================== -->
-    <div id="gameplay-screen" class="screen">
-      <div class="hud-top">
-        <div class="score-display" id="hud-score">0000000</div>
-        <div class="accuracy-display" id="hud-accuracy">100.00%</div>
+    <div id="gameplay-screen" class="screen" style="position: relative; width: 100%; height: 100%; background: #000000; overflow: hidden;">
+      <canvas id="gameplay-canvas" class="gameplay-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;"></canvas>
+
+      <div class="game-hud" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 24px; box-sizing: border-box;">
+        <div class="hud-top" style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+          <div class="hud-hp-bar-container" style="width: 250px; height: 12px; background: rgba(255,255,255,0.15); border-radius: 6px; overflow: hidden; border: 1.5px solid rgba(255,255,255,0.3); box-shadow: 0 0 10px rgba(0,0,0,0.5);">
+            <div class="hud-hp-fill" id="hud-hp-fill" style="width: 100%; height: 100%; background: linear-gradient(90deg, #ff1744 0%, #ffd600 50%, #00e676 100%); transition: width 0.08s linear;"></div>
+          </div>
+          <div style="display: flex; gap: 28px; align-items: baseline;">
+            <div class="accuracy-display" id="hud-accuracy" style="font-size: 1.8rem; font-weight: 700; color: #ff66ab; text-shadow: 0 0 10px rgba(255,102,171,0.5);">100.00%</div>
+            <div class="score-display" id="hud-score" style="font-size: 2.5rem; font-weight: 800; color: #ffffff; letter-spacing: 2px; text-shadow: 0 2px 10px rgba(0,0,0,0.7);">0000000</div>
+          </div>
+        </div>
+
+        <div class="hud-bottom-left">
+          <div class="combo-counter" id="hud-combo" style="font-size: 3.5rem; font-weight: 900; color: #ffd600; text-shadow: 0 0 15px rgba(255,214,0,0.6);">0x</div>
+        </div>
       </div>
 
-      <div class="hud-hp-bar-container">
-        <div class="hud-hp-fill" id="hud-hp-fill"></div>
+      <!-- Lazer-style Gameplay Fail Overlay -->
+      <div id="gameplay-fail-overlay" class="fail-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; background: rgba(14, 8, 20, 0.9); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); flex-direction: column; align-items: center; justify-content: center; gap: 20px;">
+        <div style="font-size: 4.5rem; font-weight: 900; color: #ff1744; text-shadow: 0 0 35px rgba(255,23,68,0.9); letter-spacing: 6px; font-family: var(--font-main);">FAILED</div>
+        <div style="font-size: 1.15rem; color: #b3a5c4; font-weight: 600;">Don't give up! Try again or choose a lower difficulty.</div>
+        <div style="display: flex; gap: 16px; margin-top: 15px;">
+          <button class="btn-lazer primary" id="btn-fail-retry" style="padding: 12px 32px; font-size: 1.1rem; font-weight: 700; cursor: pointer; border-radius: 8px; box-shadow: 0 4px 15px rgba(255,102,171,0.5);">Retry (Enter)</button>
+          <button class="btn-lazer" id="btn-fail-back" style="padding: 12px 28px; font-size: 1.1rem; cursor: pointer; border-radius: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25);">Song Select (Esc)</button>
+        </div>
       </div>
-
-      <div class="hud-bottom-left">
-        <div class="combo-counter" id="hud-combo">0x</div>
-      </div>
-
-      <canvas id="gameplay-canvas" class="gameplay-canvas"></canvas>
     </div>
 
     <!-- =====================================================================

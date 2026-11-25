@@ -23,6 +23,7 @@ class BeatmapLoader {
     this.isLoading = true;
     // 1. Preload playable official track
     const defaultPaths = [
+      "assets/osu-assets/osu.Game.Resources/Tracks/renatus.osz",
       "assets/osu-assets/osu.Game.Resources/Tracks/christmas2024.osz",
     ];
 
@@ -320,19 +321,7 @@ class BeatmapLoader {
       }
     }
 
-    // Direct browser fallback 1: osu.direct (CORS: *)
-    if (!arrayBuffer) {
-      try {
-        const res = await fetch(`https://osu.direct/d/${encodeURIComponent(setId)}`);
-        if (res.ok) {
-          arrayBuffer = await res.arrayBuffer();
-        }
-      } catch (e) {
-        console.warn("osu.direct download failed, trying sayobot:", e);
-      }
-    }
-
-    // Direct browser fallback 2: sayobot (CORS: *)
+    // Direct browser fallback 1: sayobot primary (verified CORS: *)
     if (!arrayBuffer) {
       try {
         const res = await fetch(`https://dl.sayobot.cn/beatmaps/download/mini/${encodeURIComponent(setId)}`);
@@ -340,7 +329,31 @@ class BeatmapLoader {
           arrayBuffer = await res.arrayBuffer();
         }
       } catch (e) {
-        console.warn("sayobot download failed, trying catboy:", e);
+        console.warn("sayobot primary failed, trying sayobot secondary:", e);
+      }
+    }
+
+    // Direct browser fallback 2: sayobot secondary (CORS: *)
+    if (!arrayBuffer) {
+      try {
+        const res = await fetch(`https://txy1.sayobot.cn/beatmaps/download/mini/${encodeURIComponent(setId)}`);
+        if (res.ok) {
+          arrayBuffer = await res.arrayBuffer();
+        }
+      } catch (e) {
+        console.warn("sayobot secondary failed, trying osu.direct:", e);
+      }
+    }
+
+    // Direct browser fallback 3: osu.direct
+    if (!arrayBuffer) {
+      try {
+        const res = await fetch(`https://osu.direct/d/${encodeURIComponent(setId)}`);
+        if (res.ok) {
+          arrayBuffer = await res.arrayBuffer();
+        }
+      } catch (e) {
+        console.warn("osu.direct failed:", e);
       }
     }
 
