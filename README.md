@@ -1,80 +1,164 @@
+<div align="center">
+
+<img src="assets/osu-assets/osu.Game.Resources/Textures/Menu/logo.png" width="180" alt="Yswgosu Logo"/>
+
 # 🎮 Yswgosu (osu! Web & Android Plugin)
 
-> **Кроссплатформенный ритм-клиент osu! для браузера на ПК и плагина exteraGram / Elyx на Android.**
+> **A high-performance, cross-platform osu! rhythm client built for modern Web Browsers and exteraGram / Elyx Telegram plugins on Android.**
 
-🌐 **Играть онлайн в браузере (ПК / Мобильный):**  
-👉 **[https://yenichw.github.io/Yswgosu/](https://yenichw.github.io/Yswgosu/)**
+[![Play Online](https://img.shields.io/badge/🎮_Play_Online-GitHub_Pages-ff66aa?style=for-the-badge&logo=googlechrome&logoColor=white)](https://yenichw.github.io/Yswgosu/)
+[![Platform](https://img.shields.io/badge/Platform-Web_%7C_Android_(Elyx)-00e5ff?style=for-the-badge&logo=android&logoColor=white)](#-controls)
+[![Plugin Size](https://img.shields.io/badge/Plugin_Size-~325_KB-00e676?style=for-the-badge&logo=telegram&logoColor=white)](#-android-plugin-installation-exteragram--elyx)
+[![License](https://img.shields.io/badge/License-MIT_%2F_GPL-ffd600?style=for-the-badge)](#-credits--acknowledgments)
 
----
-
-## 🌟 Основные возможности
-
-- **🎮 Кроссплатформенность 1-в-1:**
-  - **На ПК / Браузер:** Полноценное управление мышью и клавиатурой (`Z` / `X` для кликов, `Esc` для возврата/выхода), аутентичный osu! курсор с трейлом и ударной волной, прямая загрузка карт через CORS без сторонних прокси.
-  - **На Android (плагин Elyx / exteraGram):** Нативное сенсорное управление, обработка системной кнопки/жеста «Назад», авто-пауза музыки при сворачивании Telegram, ультралегковесный размер плагина (~320 КБ).
-- **🎵 Онлайн поиск и моментальная загрузка карт:**
-  - Встроенный поиск и скачивание `.osz` карт напрямую с зеркал **osu.direct**, **Sayobot** и **Catboy**.
-  - Предпрослушивание трека в меню выбора сложности перед запуском игры.
-- **💾 Персистентная библиотека (IndexedDB):**
-  - Все скачанные треки автоматически сохраняются в памяти устройства/браузера и остаются навсегда после перезагрузки.
----
-
-## 🕹 Управление
-
-### 💻 На ПК (Браузер)
-| Действие | Управление |
-|---|---|
-| **Прицеливание** | Движение мыши |
-| **Клик по нотам** | Клавиши `Z` / `X` или ЛКМ / ПКМ |
-| **Назад / Выход** | Клавиша `Escape` или стрелка назад в меню |
-
-### 📱 На Android (Плагин для exteraGram)
-| Действие | Управление |
-|---|---|
-| **Игра** | Нажатия пальцами по экрану (мультитач) |
-| **Назад / Выход** | Системный жест «Назад» / кнопка Back на смартфоне |
-| **Запуск игры** | Через команду `.osu`, `.ysw` или кнопку в настройках плагина |
+<p align="center">
+  <a href="https://yenichw.github.io/Yswgosu/"><b>🌐 Launch Web Version</b></a> •
+  <a href="#-key-features">Key Features</a> •
+  <a href="#-controls">Controls</a> •
+  <a href="#-android-plugin-installation-exteragram--elyx">Android Plugin</a> •
+  <a href="#-credits--acknowledgments">Credits</a>
+</p>
 
 ---
 
-## 📦 Установка плагина для Android (exteraGram / Elyx)
+</div>
 
-1. Скачайте файл **`Yswgosu.elyx`** (или **`Yswgosu.eaf`**).
-2. Отправьте файл в «Избранное» (Saved Messages) в Telegram.
-3. Нажмите на файл и выберите «Установить плагин».
-4. Запустите игру нажатием на кнопку в меню или отправив сообщение `.ysw` / `.osu` в любой чат.
+## 🌟 Key Features
+
+<table>
+  <tr>
+    <td width="50%">
+      <h3>🎮 1-to-1 Cross-Platform Parity</h3>
+      <ul>
+        <li><b>PC & Desktop Browsers:</b> Precision mouse tracking, keyboard streaming bindings (<kbd>Z</kbd> / <kbd>X</kbd> with auto-repeat suppression), <kbd>Esc</kbd> navigation, and authentic osu! cursor with fading trails and click shockwaves.</li>
+        <li><b>Android (exteraGram / Elyx):</b> Low-latency multi-touch support, system "Back" gesture & button integration, auto-pause on minimizing, and an ultra-compact footprint (~325 KB).</li>
+      </ul>
+    </td>
+    <td width="50%">
+      <h3>⚡ Instant Beatmap Streaming & Downloads</h3>
+      <ul>
+        <li>Direct in-game search and instant <code>.osz</code> archive streaming downloads with live progress indicators.</li>
+        <li>Multi-mirror fallback chain: <b>osu.direct</b> ➔ <b>Nerinyan</b> ➔ <b>Sayobot</b> with strict timeouts to prevent hanging.</li>
+        <li>Instant audio preview playback right from the Song Select wedge.</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h3>🎼 Universal Parser & Auto-Converter</h3>
+      <ul>
+        <li>Parses standard <code>.osu</code> v14+ formats directly in-memory using <b>JSZip</b>.</li>
+        <li><b>Universal Compatibility:</b> Automatically converts non-standard beatmapsets (Taiko, Mania, Catch) into playable standard circles and sliders on the 512×384 playfield.</li>
+      </ul>
+    </td>
+    <td width="50%">
+      <h3>💾 Offline Persistent Library</h3>
+      <ul>
+        <li>All downloaded beatmaps are automatically saved to local <b>IndexedDB</b> storage.</li>
+        <li>Installed songs remain available forever across sessions and restarts without re-downloading.</li>
+        <li>Bundled with official preloaded tracks for instant gameplay.</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
 ---
 
-## 🙏 Благодарности и Упоминания (Credits & Acknowledgments)
+## 🕹 Controls
 
-Проект **Yswgosu** создан на базе открытых наработок rhythm-gaming сообщества. Огромная благодарность всем авторам и проектам, чьи технологии и ресурсы были использованы:
+### 💻 Desktop Browser (PC / Mac / Linux)
 
-1. **[ppy (Dean Herbert)](https://github.com/ppy) & команда [osu!](https://osu.ppy.sh)**  
-   Авторы оригинальной игры osu! и osu!lazer. Оригинальная идея, геймплейная механика, форматы карт (`.osu`, `.osz`), звуковые эффекты (хитсаунды), фирменный дизайн интерфейса и анимации.  
-   *Репозиторий:* [https://github.com/ppy/osu](https://github.com/ppy/osu)
+| Action | Input | Description |
+|---|---|---|
+| **Aim** | 🖱️ Mouse Movement | Direct cursor aiming with 16-point motion trail |
+| **Hit Notes** | <kbd>Z</kbd> / <kbd>X</kbd> or <kbd>Left Click</kbd> / <kbd>Right Click</kbd> | Hardware-accurate key register (key-repeat safe) |
+| **Follow Sliders** | Hold <kbd>Z</kbd> / <kbd>X</kbd> / <kbd>Mouse</kbd> inside follow circle | Tracks slider progress and ticks |
+| **Spinners** | Rotate cursor around center | High-speed rotation detection |
+| **Pause / Back** | <kbd>Escape</kbd> or In-Game HUD button | Pauses gameplay or returns to Song Select / Main Menu |
+| **Quick Start** | <kbd>Enter</kbd> / <kbd>Space</kbd> | Starts selected beatmap instantly |
+
+### 📱 Android Smartphone (exteraGram / Elyx Plugin)
+
+| Action | Gesture / Input | Description |
+|---|---|---|
+| **Hit Notes & Sliders** | 👆 Tap & Hold Screen (Multi-touch) | Responsive multi-finger tapping with adaptive touch slop |
+| **System Back** | 🔙 Android Back Gesture / Button | Returns to menu or triggers safe exit |
+| **Launch Plugin** | `.osu` or `.ysw` in any chat | Or tap the direct button in plugin settings |
+
+---
+
+## 📦 Android Plugin Installation (exteraGram / Elyx)
+
+```
+1. Download Yswgosu.elyx (or Yswgosu.eaf) from the repository releases / root folder.
+2. Send the file to your "Saved Messages" in Telegram.
+3. Tap on the file attachment and choose "Install Plugin".
+4. Open the game by tapping the plugin action or sending .ysw or .osu in any chat!
+```
+
+---
+
+## 🏗️ Architecture & Engine Overview
+
+```
+                      ┌─────────────────────────────────────────┐
+                      │             index.html / HUD            │
+                      └────────────────────┬────────────────────┘
+                                           │
+         ┌─────────────────────────────────┼─────────────────────────────────┐
+         │                                 │                                 │
+         ▼                                 ▼                                 ▼
+┌──────────────────┐             ┌──────────────────┐             ┌──────────────────┐
+│   Audio Engine   │             │ Gameplay Engine  │             │  Game Renderer   │
+│ Web Audio + Clock│◄───────────►│ Judgements & HP  │◄───────────►│  Canvas 2D / DPR │
+└──────────────────┘             └─────────┬────────┘             └──────────────────┘
+                                           │
+                                           ▼
+                                 ┌──────────────────┐
+                                 │  Beatmap Loader  │
+                                 │ IndexedDB / OSZ  │
+                                 └─────────┬────────┘
+                                           │
+                 ┌─────────────────────────┴─────────────────────────┐
+                 ▼                                                   ▼
+      ┌─────────────────────┐                             ┌─────────────────────┐
+      │   osu.direct / CDN  │                             │ Sayobot / Nerinyan  │
+      └─────────────────────┘                             └─────────────────────┘
+```
+
+---
+
+## 🙏 Credits & Acknowledgments
+
+The **Yswgosu** project is built upon the incredible open-source heritage of the rhythm gaming and web development communities. Sincere gratitude to all authors and teams whose technologies and assets made this possible:
+
+1. **[ppy (Dean Herbert)](https://github.com/ppy) & the [osu!](https://osu.ppy.sh) Team**  
+   Creators of the original osu! and osu!lazer games. For the revolutionary gameplay design, beatmap formats (`.osu`, `.osz`), sound design, visual identity, and endless inspiration.  
+   *Repository:* [https://github.com/ppy/osu](https://github.com/ppy/osu)
 
 2. **[kosu!](https://github.com/) WebGL Project**  
-   Базовая архитектура WebGL-клиента для рендеринга игрового поля и парсинга базовых элементов меню на PixiJS.
+   Foundational web architecture and asset pipeline inspiration.
 
 3. **[PixiJS](https://pixijs.com)**  
-   Высокопроизводительный 2D WebGL движок, обеспечивающий плавный рендеринг 60+ FPS в веб-окружении.
+   Industry-standard 2D WebGL rendering engine powering smooth 60+ FPS web performance.
 
 4. **[JSZip](https://stuk.github.io/jszip/)**  
-   Быстрая распаковка архивов `.osz` прямо в оперативной памяти браузера без сохранения промежуточных файлов на диск.
+   Blazing-fast in-memory `.osz` zip archive extraction without temporary disk overhead.
 
-5. **Публичные зеркала карт osu!:**
-   - **[osu.direct](https://osu.direct)** — быстрый открытый API поиска и прямых загрузок карт с поддержкой CORS.
-   - **[Sayobot](https://sayobot.cn)** — стабильное зеркало с глобальной сетью доставки контента.
-   - **[Catboy / Mino](https://catboy.best)** — альтернативный бекэнд поиска и загрузки beatmap-сетов.
+5. **Public Beatmap Mirrors:**
+   - **[osu.direct](https://osu.direct)** — High-speed public beatmap API and clean CORS endpoints.
+   - **[Nerinyan](https://api.nerinyan.moe)** — Cloudflare-accelerated beatmap mirror.
+   - **[Sayobot](https://sayobot.cn)** — Established beatmap delivery network.
+   - **[Catboy / Mino](https://catboy.best)** — Alternative beatmap database and metadata provider.
 
-6. **[exteraGram](https://github.com/exteraClan/exteraGram) / Elyx**  
-   Платформа плагинов и среда выполнения для Android Telegram клиентов.
+6. **[exteraGram](https://github.com/exteraClan/exteraGram) & Elyx Platform**  
+   The powerful plugin platform and execution environment for modern Android Telegram clients.
 
 ---
 
-## 👤 Автор и поддержка
+## 👤 Author & Support
 
-- **Разработчик / адаптация:** **[yenichw](https://github.com/yenichw and dolphin distiled(haha)**
-- **Репозиторий проекта:** [https://github.com/yenichw/Yswgosu](https://github.com/yenichw/Yswgosu)
-- **Лицензия:** MIT / GNU GPL (в соответствии с зависимостями оригинального osu!).
+- **Lead Developer & Adaptation:** [yenichw](https://github.com/yenichw) (feat. dolphin distilled)
+- **Repository:** [https://github.com/yenichw/Yswgosu](https://github.com/yenichw/Yswgosu)
+- **Play Online:** [https://yenichw.github.io/Yswgosu/](https://yenichw.github.io/Yswgosu/)
+- **License:** MIT / GNU GPL (aligned with upstream osu! dependencies)
