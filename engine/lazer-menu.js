@@ -694,6 +694,7 @@ class LazerUI {
     const canvas = document.getElementById("gameplay-canvas");
     if (canvas) {
       canvas.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
         const rect = canvas.getBoundingClientRect();
         this.game.handlePointerDown(e.pointerId, e.clientX - rect.left, e.clientY - rect.top);
       });
@@ -703,21 +704,23 @@ class LazerUI {
         this.game.handlePointerMove(e.pointerId, e.clientX - rect.left, e.clientY - rect.top);
       });
 
-      canvas.addEventListener("pointerup", (e) => {
+      window.addEventListener("pointerup", (e) => {
         this.game.handlePointerUp(e.pointerId);
       });
 
-      canvas.addEventListener("pointercancel", (e) => {
+      window.addEventListener("pointercancel", (e) => {
         this.game.handlePointerUp(e.pointerId);
       });
 
-      // Keyboard bindings (Z, X keys)
+      // Keyboard bindings (Z, X keys) - Ignore auto-repeat to prevent phantom scoring!
       window.addEventListener("keydown", (e) => {
+        if (e.repeat) return; // Ignore OS key-repeat so holding key doesn't fire 30 hits/sec
         if (e.code === "KeyZ" || e.code === "KeyX") {
-          this.game.handlePointerDown("key",
-            this.game.pointer.x * this.game.playfield.scale + this.game.playfield.x,
-            this.game.pointer.y * this.game.playfield.scale + this.game.playfield.y
-          );
+          e.preventDefault();
+          const keyId = e.code === "KeyZ" ? "key_z" : "key_x";
+          const screenX = this.game.toScreenX(this.game.pointer.x);
+          const screenY = this.game.toScreenY(this.game.pointer.y);
+          this.game.handlePointerDown(keyId, screenX, screenY);
         } else if (e.code === "Escape") {
           if (this.game.isRunning) {
             this.game.stop();
@@ -728,7 +731,9 @@ class LazerUI {
 
       window.addEventListener("keyup", (e) => {
         if (e.code === "KeyZ" || e.code === "KeyX") {
-          this.game.handlePointerUp("key");
+          e.preventDefault();
+          const keyId = e.code === "KeyZ" ? "key_z" : "key_x";
+          this.game.handlePointerUp(keyId);
         }
       });
     }

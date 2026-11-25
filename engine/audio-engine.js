@@ -184,14 +184,25 @@ class AudioEngine {
     if (!this.isPlaying) return 0;
     if (this.isPaused) return this.pauseOffsetSec * 1000;
 
+    // 1. High-precision Web Audio hardware clock
     if (this.currentSourceNode && this.ctx) {
       return (this.ctx.currentTime - this.trackStartTime) * 1000;
     }
+
+    // 2. High-precision monotonic clock synchronized with HTML5 audio (smooth, no 250ms jitter)
     if (this.currentAudioElement && !this.currentAudioElement.paused) {
-      return this.currentAudioElement.currentTime * 1000;
+      const now = performance.now();
+      const rawAudioMs = this.currentAudioElement.currentTime * 1000;
+      const monotonicMs = now - this.fallbackStartTime;
+
+      const drift = rawAudioMs - monotonicMs;
+      if (Math.abs(drift) > 50) {
+        this.fallbackStartTime = now - rawAudioMs;
+      }
+      return now - this.fallbackStartTime;
     }
 
-    // High-resolution monotonic fallback clock
+    // 3. High-resolution monotonic fallback clock
     return performance.now() - this.fallbackStartTime;
   }
 

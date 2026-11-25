@@ -242,6 +242,13 @@ class GameplayEngine {
 
       // Sliders: track progress
       else if (obj.objectType === "slider") {
+        if (!obj._sliderInit) {
+          obj._sliderInit = true;
+          obj.trackingTicksTotal = 0;
+          obj.trackingTicksHit = 0;
+          obj.headHit = false;
+        }
+
         if (this.currentTime >= obj.time && this.currentTime <= obj.endTime) {
           const duration = obj.duration || 500;
           const elapsed = this.currentTime - obj.time;
@@ -257,7 +264,7 @@ class GameplayEngine {
 
           if (typeof SliderCalculator !== "undefined" && obj.samples) {
             const ballPos = SliderCalculator.getPositionAtProgress(obj.samples, obj.pixelLength, spanProgress);
-            const followRadius = this.circleRadius * 2.5;
+            const followRadius = Math.max(this.circleRadius * 2.5, 55 / (this.playfield.scale || 1));
             let isTracked = false;
 
             if (this.isAuto) {
@@ -277,10 +284,30 @@ class GameplayEngine {
               }
             }
             obj.isTracking = isTracked;
+
+            // Track sample points throughout slider duration
+            obj.trackingTicksTotal++;
+            if (isTracked) obj.trackingTicksHit++;
           }
         } else if (this.currentTime > obj.endTime + this.hit50) {
-          const result = (obj.isTracking || this.isAuto) ? 300 : (obj.result !== null ? obj.result : 100);
-          this._applyJudgement(obj, result, obj.x, obj.y);
+          // Finished slider judgement:
+          // If player never hit the head AND never tracked: MISS (0 points, combo break!)
+          if (!this.isAuto && !obj.headHit && (!obj.trackingTicksHit || obj.trackingTicksHit === 0)) {
+            this._applyJudgement(obj, 0, obj.x, obj.y);
+          } else {
+            const trackRatio = obj.trackingTicksTotal > 0 ? (obj.trackingTicksHit / obj.trackingTicksTotal) : 0;
+            let result = 300;
+            if (this.isAuto) {
+              result = 300;
+            } else if (obj.headHit && trackRatio >= 0.65) {
+              result = 300;
+            } else if (obj.headHit || trackRatio >= 0.35) {
+              result = 100;
+            } else {
+              result = 50;
+            }
+            this._applyJudgement(obj, result, obj.x, obj.y);
+          }
         }
       }
 
@@ -456,16 +483,23 @@ class GameplayEngine {
 
   _tryHitAt(x, y) {
     const objects = this.beatmap.hitObjects;
+    // Mobile finger-friendly touch tolerance + PC precision
+    const effectiveRadius = Math.max(this.circleRadius * 1.45, 42 / (this.playfield.scale || 1));
 
     for (let i = 0; i < objects.length; i++) {
       const obj = objects[i];
       if (obj.judged) continue;
 
+      // Since objects are sorted by time, if note is far in the future, break early
+      if (obj.time - this.currentTime > this.hit50) {
+        break;
+      }
+
       const timeDiff = Math.abs(this.currentTime - obj.time);
       if (timeDiff > this.hit50) continue;
 
       const dist = Math.hypot(x - obj.x, y - obj.y);
-      if (dist <= this.circleRadius * 1.35) {
+      if (dist <= effectiveRadius) {
         let result = 0;
         if (timeDiff <= this.hit300) result = 300;
         else if (timeDiff <= this.hit100) result = 100;
@@ -476,6 +510,8 @@ class GameplayEngine {
           this.audio.playHitSound(obj.hitSound);
           return;
         } else if (obj.objectType === "slider") {
+          obj.headHit = true;
+          obj.headResult = result;
           obj.isTracking = true;
           this.audio.playHitSound(obj.hitSound);
           return;
