@@ -35,10 +35,22 @@
         try { window.AudioEngineInstance.resume(); } catch (e) {}
       }
       if (window.lazerUI) {
-        try { window.lazerUI.switchScreen("songSelect"); } catch (e) {}
+        try {
+          window.lazerUI.switchScreen("songSelect");
+          window.lazerUI.refreshSongList();
+        } catch (e) {
+          console.warn("switchScreen error:", e);
+        }
       }
     };
     window.onOsuLogoClicked = window.openSongSelect;
+
+    // Helper: Check if Kosu has completed intro and is on the interactive Main Menu (screen N)
+    window.isKosuOnMainMenu = function() {
+      if (!window.KosuMain || !window.KosuMain.currentScreen) return false;
+      const s = window.KosuMain.currentScreen;
+      return !!(s.osuCircle || (s.constructor && s.constructor.name === "N"));
+    };
 
     // Neutralize persistent MediaSession so Android doesn't treat WebView as background music player
     try {
@@ -545,10 +557,13 @@
     })();
   </script>
 
-  <!-- Global Main Menu Click Interceptor (Capture phase: always opens Song Select) -->
+  <!-- Global Main Menu Click Interceptor (Only intercepts when on screen N!) -->
   <script>
     (function initMainMenuClickInterceptor() {
       function handleMainMenuClick(e) {
+        // Only intercept if Kosu has passed the intro and is actively on the Main Menu (screen N)!
+        if (!window.isKosuOnMainMenu || !window.isKosuOnMainMenu()) return;
+
         const container = document.getElementById("app-container");
         if (container && container.style.display === "flex") return;
 
@@ -557,7 +572,7 @@
 
         if (e.target && e.target.closest && e.target.closest("#main-menu-exit-bar")) return;
 
-        // When in main menu, any tap or click anywhere opens Song Select!
+        // When in main menu, any tap or click opens Song Select!
         window.openSongSelect();
       }
 
@@ -677,10 +692,12 @@
       // Keyboard controls (Space / Enter opens Song Select or starts game, Escape goes Back / Exits)
       window.addEventListener("keydown", (e) => {
         if (container.style.display !== "flex") {
-          if (e.code === "Space" || e.code === "Enter") {
-            e.preventDefault();
-            window.openSongSelect();
-            return;
+          if (window.isKosuOnMainMenu && window.isKosuOnMainMenu()) {
+            if (e.code === "Space" || e.code === "Enter") {
+              e.preventDefault();
+              window.openSongSelect();
+              return;
+            }
           }
         } else if (ui && ui.screens && ui.screens.songSelect && ui.screens.songSelect.classList.contains("active")) {
           if (e.code === "Enter") {
@@ -708,7 +725,7 @@
         }
       };
 
-      // Load the 2 official tracks
+      // Load official playable track
       try {
         await loader.initDefaultBeatmaps();
         ui.refreshSongList();

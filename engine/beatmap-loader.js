@@ -20,9 +20,8 @@ class BeatmapLoader {
    * Loads preloaded official tracks and all stored beatmaps from IndexedDB
    */
   async initDefaultBeatmaps() {
-    // 1. Preloaded official tracks
+    // 1. Preload playable official track
     const defaultPaths = [
-      "assets/osu-assets/osu.Game.Resources/Tracks/welcome.osz",
       "assets/osu-assets/osu.Game.Resources/Tracks/christmas2024.osz",
     ];
 
