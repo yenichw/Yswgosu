@@ -19,6 +19,27 @@
     window.allAudioContexts = [];
     window.allAudioElements = [];
 
+    // Global Early Handler for Opening Song Select
+    window.openSongSelect = function() {
+      const container = document.getElementById("app-container");
+      if (container) {
+        container.style.display = "flex";
+      }
+      const exitBar = document.getElementById("main-menu-exit-bar");
+      if (exitBar) exitBar.style.display = "none";
+
+      if (window.pauseKosuAudio) {
+        try { window.pauseKosuAudio(); } catch (e) {}
+      }
+      if (window.AudioEngineInstance && window.AudioEngineInstance.resume) {
+        try { window.AudioEngineInstance.resume(); } catch (e) {}
+      }
+      if (window.lazerUI) {
+        try { window.lazerUI.switchScreen("songSelect"); } catch (e) {}
+      }
+    };
+    window.onOsuLogoClicked = window.openSongSelect;
+
     // Neutralize persistent MediaSession so Android doesn't treat WebView as background music player
     try {
       if (navigator.mediaSession) {
@@ -256,6 +277,11 @@
               <span class="stat-value" id="stat-hp">5.0</span>
             </div>
           </div>
+
+          <!-- Direct Play Button -->
+          <button class="btn-lazer primary" id="btn-wedge-play" style="width: 100%; padding: 12px; font-size: 1.05rem; font-weight: 700; margin-top: 10px; cursor: pointer; border-radius: 8px; box-shadow: 0 4px 14px rgba(255, 102, 171, 0.4);">
+            ▶ PLAY BEATMAP
+          </button>
         </div>
 
         <!-- Right: Scrollable Beatmap Carousel -->
@@ -519,6 +545,28 @@
     })();
   </script>
 
+  <!-- Global Main Menu Click Interceptor (Capture phase: always opens Song Select) -->
+  <script>
+    (function initMainMenuClickInterceptor() {
+      function handleMainMenuClick(e) {
+        const container = document.getElementById("app-container");
+        if (container && container.style.display === "flex") return;
+
+        const overlay = document.getElementById("exit-overlay");
+        if (overlay && overlay.style.display === "flex") return;
+
+        if (e.target && e.target.closest && e.target.closest("#main-menu-exit-bar")) return;
+
+        // When in main menu, any tap or click anywhere opens Song Select!
+        window.openSongSelect();
+      }
+
+      document.addEventListener("pointerdown", handleMainMenuClick, true);
+      document.addEventListener("click", handleMainMenuClick, true);
+      document.addEventListener("touchend", handleMainMenuClick, { passive: true, capture: true });
+    })();
+  </script>
+
   <!-- Local Rhythm Game Engine Scripts -->
   <script src="engine/jszip.min.js"></script>
   <script src="engine/slider-calc.js"></script>
@@ -536,6 +584,7 @@
       const btnBackToMenu = document.getElementById("btn-back-to-menu");
       const mainMenuExitBar = document.getElementById("main-menu-exit-bar");
       const btnMainExit = document.getElementById("btn-main-exit");
+      const btnWedgePlay = document.getElementById("btn-wedge-play");
 
       const gameplayCanvas = document.getElementById("gameplay-canvas");
       const audio = new AudioEngine();
@@ -547,17 +596,13 @@
       const ui = new LazerUI(audio, gameplay, renderer, loader);
       window.lazerUI = ui;
 
-      function openSongSelect() {
-        if (container.style.display === "flex") return;
-        if (window.pauseKosuAudio) {
-          try { window.pauseKosuAudio(); } catch (e) {}
-        }
-        if (audio && audio.resume) {
-          try { audio.resume(); } catch (e) {}
-        }
-        container.style.display = "flex";
-        if (mainMenuExitBar) mainMenuExitBar.style.display = "none";
-        ui.switchScreen("songSelect");
+      // Direct Play Button in Wedge details panel
+      if (btnWedgePlay) {
+        btnWedgePlay.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          ui.playCurrentBeatmap();
+        });
       }
 
       function backToMainMenu(e) {
@@ -594,32 +639,6 @@
         } catch (err) {}
       }
 
-      // 1. Hook into Kosu's PixiJS osu! logo click
-      window.onOsuLogoClicked = openSongSelect;
-
-      // 2. Direct click handler on canvas center (where the pulsating osu! logo is rendered)
-      function handleCanvasClick(e) {
-        if (container.style.display === "flex") return;
-        const overlay = document.getElementById("exit-overlay");
-        if (overlay && overlay.style.display === "flex") return;
-
-        // If clicking on the floating exit button, let it handle the event
-        if (e.target && e.target.closest && e.target.closest("#main-menu-exit-bar")) return;
-
-        // Check if tap was near the central osu! logo
-        const cx = window.innerWidth / 2;
-        const cy = window.innerHeight / 2;
-        const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
-        const logoRadius = Math.min(window.innerWidth, window.innerHeight) * 0.38;
-        if (dist <= logoRadius) {
-          openSongSelect();
-        }
-      }
-
-      window.addEventListener("click", handleCanvasClick);
-      window.addEventListener("pointerdown", handleCanvasClick);
-      window.addEventListener("touchend", handleCanvasClick, { passive: true });
-
       // Exit button on main menu
       if (btnMainExit) {
         btnMainExit.addEventListener("click", (e) => {
@@ -655,12 +674,18 @@
         }, 1100);
       };
 
-      // Keyboard controls (Space / Enter opens Song Select, Escape goes Back / Exits)
+      // Keyboard controls (Space / Enter opens Song Select or starts game, Escape goes Back / Exits)
       window.addEventListener("keydown", (e) => {
         if (container.style.display !== "flex") {
           if (e.code === "Space" || e.code === "Enter") {
             e.preventDefault();
-            openSongSelect();
+            window.openSongSelect();
+            return;
+          }
+        } else if (ui && ui.screens && ui.screens.songSelect && ui.screens.songSelect.classList.contains("active")) {
+          if (e.code === "Enter") {
+            e.preventDefault();
+            ui.playCurrentBeatmap();
             return;
           }
         }
