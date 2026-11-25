@@ -21,24 +21,61 @@ class BeatmapLoader {
    */
   async initDefaultBeatmaps() {
     this.isLoading = true;
-    // 1. Preload playable official track
-    const defaultPaths = [
-      "assets/osu-assets/osu.Game.Resources/Tracks/renatus.osz",
-      "assets/osu-assets/osu.Game.Resources/Tracks/christmas2024.osz",
-    ];
+    if (window.EngineLog) window.EngineLog.info("LOADER", "Starting beatmap initialization sequence...");
 
-    for (const p of defaultPaths) {
+    // 1. Fast initial track (circle the halls, 2.9 MB)
+    const primaryPath = "assets/osu-assets/osu.Game.Resources/Tracks/christmas2024.osz";
+    try {
+      if (window.EngineLog) window.EngineLog.info("LOADER", `Fetching primary track: ${primaryPath}`);
+      const res = await fetch(primaryPath);
+      if (res.ok) {
+        const buffer = await res.arrayBuffer();
+        await this.importOsz(buffer);
+        if (window.EngineLog) window.EngineLog.info("LOADER", "Primary track unpacked successfully");
+        if (this.onSetLoaded) this.onSetLoaded();
+      }
+    } catch (e) {
+      if (window.EngineLog) window.EngineLog.warn("LOADER", `Failed loading primary track ${primaryPath}: ${e.message}`);
+    }
+
+    // 2. Load stored user beatmaps from persistent IndexedDB
+    try {
+      if (typeof BeatmapStorage !== "undefined") {
+        const stored = await BeatmapStorage.loadAllBeatmaps();
+        if (stored.length > 0) {
+          if (window.EngineLog) window.EngineLog.info("LOADER", `Restoring ${stored.length} tracks from IndexedDB`);
+          for (const item of stored) {
+            if (item.data) {
+              try { await this.importOsz(item.data); } catch (err) {}
+            }
+          }
+          if (this.onSetLoaded) this.onSetLoaded();
+        }
+      }
+    } catch (e) {
+      if (window.EngineLog) window.EngineLog.warn("LOADER", "IndexedDB restore error: " + e.message);
+    }
+
+    this.isLoading = false;
+    if (this.onSetLoaded) this.onSetLoaded();
+
+    // 3. Non-blocking background preload of Renatus (6 MB, 12 difficulties)
+    // Ensures mobile UI stays 100% smooth and interactive immediately!
+    setTimeout(async () => {
+      const secondaryPath = "assets/osu-assets/osu.Game.Resources/Tracks/renatus.osz";
       try {
-        const res = await fetch(p);
+        if (window.EngineLog) window.EngineLog.info("LOADER", `Background preloading ${secondaryPath}...`);
+        const res = await fetch(secondaryPath);
         if (res.ok) {
           const buffer = await res.arrayBuffer();
           await this.importOsz(buffer);
+          if (window.EngineLog) window.EngineLog.info("LOADER", "Renatus (12 diffs) background preload complete!");
           if (this.onSetLoaded) this.onSetLoaded();
         }
-      } catch (e) {
-        console.warn("Could not preload " + p, e);
+      } catch (err) {
+        if (window.EngineLog) window.EngineLog.warn("LOADER", `Background preload skipped/failed: ${err.message}`);
       }
-    }
+    }, 400);
 
     // 2. Load all saved songs from persistent IndexedDB
     try {

@@ -543,10 +543,21 @@ class LazerUI {
   playCurrentBeatmap() {
     const diff = this.loader.activeDifficulty;
     const set = this.loader.activeSet;
-    if (!diff) return;
+    if (!diff) {
+      if (window.EngineLog) window.EngineLog.warn("GAMEPLAY", "Cannot start beatmap: no difficulty selected");
+      return;
+    }
+
+    if (window.EngineLog) {
+      window.EngineLog.info("GAMEPLAY", `Starting beatmap: ${set ? set.title : "Unknown"} [${diff.metadata ? diff.metadata.Version : "Normal"}]`);
+    }
+
+    if (window.FSM) {
+      window.FSM.transitionTo(GameStates.GAMEPLAY);
+    }
 
     if (window.pauseKosuAudio) {
-      window.pauseKosuAudio();
+      try { window.pauseKosuAudio(); } catch (e) {}
     }
 
     this.audio.resume();
@@ -555,10 +566,16 @@ class LazerUI {
     this.audio.currentTrackBuffer = (set && set.audioBuffer) ? set.audioBuffer : null;
     this.audio.currentAudioBlobUrl = (set && set.audioBlobUrl) ? set.audioBlobUrl : null;
 
-    this.game.loadBeatmap(diff);
-    this.switchScreen("gameplay");
-    if (this.renderer) this.renderer._resize();
-    this.game.start();
+    try {
+      this.game.loadBeatmap(diff);
+      this.switchScreen("gameplay");
+      if (this.renderer) this.renderer._resize();
+      this.game.start();
+    } catch (err) {
+      if (window.EngineLog) {
+        window.EngineLog.crash(err, "Failed to start gameplay");
+      }
+    }
   }
 
   // ===================================================================
@@ -724,22 +741,7 @@ class LazerUI {
       exitBtn.addEventListener("click", triggerExit);
     }
 
-    // 6. Fail Screen Buttons (Retry & Quit)
-    const btnFailRetry = document.getElementById("btn-fail-retry");
-    if (btnFailRetry) {
-      btnFailRetry.addEventListener("click", () => {
-        if (this.failOverlay) this.failOverlay.style.display = "none";
-        this.playCurrentBeatmap();
-      });
-    }
 
-    const btnFailQuit = document.getElementById("btn-fail-quit");
-    if (btnFailQuit) {
-      btnFailQuit.addEventListener("click", () => {
-        if (this.failOverlay) this.failOverlay.style.display = "none";
-        this.switchScreen("songSelect");
-      });
-    }
 
     // 7. Gameplay Callbacks
         const btnFailRetry = document.getElementById("btn-fail-retry");
@@ -759,6 +761,8 @@ class LazerUI {
     }
 
     this.game.onGameFail = () => {
+      if (window.FSM) window.FSM.transitionTo(GameStates.FAILED);
+      if (window.EngineLog) window.EngineLog.info("GAMEPLAY", "Player failed beatmap (HP reached 0)");
       if (this.failOverlay) this.failOverlay.style.display = "flex";
     };
 
@@ -770,6 +774,8 @@ class LazerUI {
     };
 
     this.game.onGameEnd = (results) => {
+      if (window.FSM) window.FSM.transitionTo(GameStates.RESULTS);
+      if (window.EngineLog) window.EngineLog.info("GAMEPLAY", "Beatmap completed successfully", results);
       this._showResults(results);
     };
 

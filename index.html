@@ -8,6 +8,10 @@
   <link href="main.a37e724502caaf4a68ea.css" rel="stylesheet">
   <link href="engine/game-ui.css" rel="stylesheet">
 
+  <!-- Core Diagnostics & Deterministic State Machine (Must load first!) -->
+  <script src="engine/crash-logger.js"></script>
+  <script src="engine/state-machine.js"></script>
+
   <!-- Audio Interceptor & Dynamic API Base for Local + GitHub Pages -->
   <script>
     const _urlParams = new URLSearchParams(window.location.search);
@@ -21,6 +25,9 @@
 
     // Global Early Handler for Opening Song Select
     window.openSongSelect = function() {
+      if (window.FSM) {
+        window.FSM.transitionTo(GameStates.SONG_SELECT);
+      }
       const container = document.getElementById("app-container");
       if (container) {
         container.style.display = "flex";
@@ -39,7 +46,7 @@
           window.lazerUI.switchScreen("songSelect");
           window.lazerUI.refreshSongList();
         } catch (e) {
-          console.warn("switchScreen error:", e);
+          if (window.EngineLog) window.EngineLog.crash(e, "Error opening Song Select");
         }
       }
     };
@@ -737,13 +744,10 @@
         }
       };
 
-      // Load official playable track
-      try {
-        await loader.initDefaultBeatmaps();
-        ui.refreshSongList();
-      } catch (e) {
-        console.warn("Failed to load tracks:", e);
-      }
+      // Asynchronous non-blocking beatmap loading (keeps UI instant on mobile & PC)
+      loader.initDefaultBeatmaps().catch(err => {
+        if (window.EngineLog) window.EngineLog.warn("LOADER", "Beatmap init error: " + err.message);
+      });
     });
   </script>
 </body>
