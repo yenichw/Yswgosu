@@ -80,15 +80,6 @@
 
 ---
 
-## 📦 Android Plugin Installation (exteraGram / Elyx)
-
-```
-1. Download Yswgosu.elyx (or Yswgosu.eaf) from the repository releases / root folder.
-2. Send the file to your "Saved Messages" in Telegram.
-3. Tap on the file attachment and choose "Install Plugin".
-4. Open the game by tapping the plugin action or sending .ysw or .osu in any chat!
-```
-
 ---
 
 ## 🏗️ Architecture & Engine Overview
