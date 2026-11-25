@@ -115,25 +115,15 @@ class BeatmapLoader {
     // Parse all difficulties first to find the primary song AudioFilename and Background
     let targetAudioFilename = "";
     let targetBgFilename = "";
-    const parsedDiffs = [];
-    let nonStandardDiffsCount = 0;
+    const standardDiffs = [];
+    const otherModeDiffs = [];
 
     for (const osuEntry of osuFiles) {
       try {
         const rawText = await osuEntry.async("text");
         const parsed = BeatmapParser.parse(rawText);
 
-        if (!parsed) continue;
-
-        // Filter: ONLY accept standard osu! (Mode 0) beatmaps with playable objects
-        const mode = parseInt(parsed.general.Mode, 10);
-        if (!isNaN(mode) && mode !== 0) {
-          nonStandardDiffsCount++;
-          continue;
-        }
-        if (!parsed.hitObjects || parsed.hitObjects.length === 0) {
-          continue;
-        }
+        if (!parsed || !parsed.hitObjects || parsed.hitObjects.length === 0) continue;
 
         if (!targetAudioFilename && parsed.general && parsed.general.AudioFilename) {
           targetAudioFilename = parsed.general.AudioFilename.trim().toLowerCase();
@@ -143,16 +133,52 @@ class BeatmapLoader {
           targetBgFilename = parsed.events.background.trim().toLowerCase();
         }
 
-        parsedDiffs.push(parsed);
+        const mode = parseInt(parsed.general.Mode, 10);
+        if (isNaN(mode) || mode === 0) {
+          standardDiffs.push(parsed);
+        } else {
+          otherModeDiffs.push(parsed);
+        }
       } catch (err) {
         console.warn("Error parsing .osu diff:", err);
       }
     }
 
-    if (parsedDiffs.length === 0) {
-      if (nonStandardDiffsCount > 0) {
-        throw new Error("Set contains no osu!standard difficulties (Taiko/Mania/Catch only)");
+    let parsedDiffs = [];
+    if (standardDiffs.length > 0) {
+      parsedDiffs = standardDiffs;
+    } else if (otherModeDiffs.length > 0) {
+      // Auto-convert non-standard maps (Taiko/Catch/Mania) to standard 512x384 playfield
+      for (const diff of otherModeDiffs) {
+        const mode = parseInt(diff.general.Mode, 10);
+        const modeLabel = mode === 1 ? "Taiko" : mode === 2 ? "Catch" : "Mania";
+        diff.metadata.Version = `${diff.metadata.Version} [${modeLabel}]`;
+
+        diff.hitObjects.forEach((obj) => {
+          if (mode === 1) {
+            // Taiko: smooth rhythmic circular flow around playfield center (256, 192)
+            const angle = (obj.time / 550) % (Math.PI * 2);
+            const radius = 120 + Math.sin(obj.time / 1200) * 45;
+            obj.x = Math.max(50, Math.min(462, Math.round(256 + Math.cos(angle) * radius)));
+            obj.y = Math.max(50, Math.min(334, Math.round(192 + Math.sin(angle) * radius)));
+          } else if (mode === 3) {
+            // Mania: 4-lane layout mapped across playfield
+            const col = Math.min(3, Math.floor((obj.x || 0) * 4 / 512));
+            obj.x = 96 + col * 106;
+            obj.y = Math.max(60, Math.min(324, 120 + ((obj.time / 700) % 180)));
+          } else if (mode === 2) {
+            // Catch: retain horizontal position, smooth wave vertical
+            obj.y = Math.max(60, Math.min(324, 192 + Math.sin(obj.time / 600) * 90));
+          }
+        });
+        parsedDiffs.push(diff);
       }
+      if (window.EngineLog) {
+        window.EngineLog.info("LOADER", `Auto-converted ${parsedDiffs.length} non-standard diffs into osu!standard`);
+      }
+    }
+
+    if (parsedDiffs.length === 0) {
       return null;
     }
 
@@ -304,16 +330,25 @@ class BeatmapLoader {
       }
     }
 
-    // Direct browser fallback 1: osu.direct (CORS: *)
+    // Direct browser fallback 1: osu.direct with mode=0 (standard osu! first)
+    try {
+      const res = await fetch(`https://osu.direct/api/v2/search?q=${encodeURIComponent(query)}&mode=0`);
+      if (res.ok) {
+        const list = await res.json();
+        if (Array.isArray(list) && list.length > 0) return list;
+      }
+    } catch (e) {
+      console.warn("osu.direct mode=0 search failed, trying general search:", e);
+    }
+
+    // Direct browser fallback 2: osu.direct general (all modes)
     try {
       const res = await fetch(`https://osu.direct/api/v2/search?q=${encodeURIComponent(query)}`);
       if (res.ok) {
         const list = await res.json();
         if (Array.isArray(list) && list.length > 0) return list;
       }
-    } catch (e) {
-      console.warn("osu.direct search failed, trying catboy:", e);
-    }
+    } catch (e) {}
 
     // Direct browser fallback 2: catboy
     try {
