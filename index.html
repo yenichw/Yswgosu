@@ -374,13 +374,7 @@
     </div>
   </div>
 
-  <!-- Persistent Main Menu Exit Button (visible only when in Kosu Main Menu) -->
-  <div id="main-menu-exit-bar" style="position: fixed; bottom: 16px; left: 16px; z-index: 100; display: flex; align-items: center; gap: 8px;">
-    <button id="btn-main-exit" style="background: rgba(20, 16, 28, 0.75); border: 1px solid rgba(255, 102, 171, 0.4); border-radius: 20px; color: #ffffff; padding: 7px 18px; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 7px; backdrop-filter: blur(8px); box-shadow: 0 4px 14px rgba(0,0,0,0.4); transition: transform 0.15s ease;">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-      <span>Exit</span>
-    </button>
-  </div>
+
 
   <!-- Local Rhythm Game Engine Scripts -->
   <script src="engine/jszip.min.js"></script>
@@ -408,15 +402,11 @@
       const ui = new LazerUI(audio, gameplay, renderer, loader);
       window.lazerUI = ui;
 
-      const mainExitBar = document.getElementById("main-menu-exit-bar");
-      const btnMainExit = document.getElementById("btn-main-exit");
-
       function openSongSelect() {
         if (container.style.display === "flex") return;
         window.pauseKosuAudio();
         audio.resume();
         container.style.display = "flex";
-        if (mainExitBar) mainExitBar.style.display = "none";
         ui.switchScreen("songSelect");
       }
 
@@ -436,7 +426,6 @@
         const screenBg = document.getElementById("screen-bg-image");
         if (screenBg) screenBg.style.backgroundImage = "none";
 
-        if (mainExitBar) mainExitBar.style.display = "flex";
         if (window.AudioEngineInstance) {
           window.AudioEngineInstance.stopTrack();
         }
@@ -502,12 +491,13 @@
         }, 1100);
       };
 
-      if (btnMainExit) {
-        btnMainExit.addEventListener("click", (e) => {
-          e.stopPropagation();
-          window.triggerExitSequence();
-        });
-      }
+      // Global Escape key handler for PC cross-platform
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "Escape") {
+          e.preventDefault();
+          window.handleAndroidBack();
+        }
+      });
 
       // Back arrow in Song Select returns to Main Menu
       btnBackToMenu.addEventListener("click", backToMainMenu);

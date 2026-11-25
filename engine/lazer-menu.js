@@ -162,8 +162,8 @@ class LazerUI {
         const offset = itemOrSet.previewTime > 0 ? itemOrSet.previewTime : 35000;
         this.audio.playTrack(offset);
       } else if (itemOrSet.id) {
-        // Online beatmap set preview via catboy / ppy mirror
-        const previewUrl = `https://catboy.best/preview/audio/${itemOrSet.id}?preview=1`;
+        // Online beatmap set preview via official osu! CDN / osu.direct / catboy
+        const previewUrl = itemOrSet.preview_url || `https://b.ppy.sh/preview/${itemOrSet.id}.mp3`;
         this.audio.playPreviewUrl(previewUrl);
       }
     } catch (e) {

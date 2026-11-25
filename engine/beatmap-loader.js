@@ -266,16 +266,30 @@ class BeatmapLoader {
     if (!query || !query.trim()) return [];
 
     const apiBase = window.API_BASE || "";
+    if (apiBase) {
+      try {
+        const res = await fetch(`${apiBase}/api/search?q=${encodeURIComponent(query)}`);
+        if (res.ok) {
+          const list = await res.json();
+          if (Array.isArray(list)) return list;
+        }
+      } catch (e) {
+        console.warn("Local search proxy failed, falling back to direct:", e);
+      }
+    }
+
+    // Direct browser fallback 1: osu.direct (CORS: *)
     try {
-      const res = await fetch(`${apiBase}/api/search?q=${encodeURIComponent(query)}`);
+      const res = await fetch(`https://osu.direct/api/v2/search?q=${encodeURIComponent(query)}`);
       if (res.ok) {
         const list = await res.json();
         if (Array.isArray(list)) return list;
       }
     } catch (e) {
-      console.warn("Local search proxy failed, falling back to direct:", e);
+      console.warn("osu.direct search failed, trying catboy:", e);
     }
 
+    // Direct browser fallback 2: catboy
     try {
       const res = await fetch(`https://catboy.best/api/v2/search?q=${encodeURIComponent(query)}`);
       if (res.ok) {
@@ -294,15 +308,42 @@ class BeatmapLoader {
     let arrayBuffer = null;
 
     const apiBase = window.API_BASE || "";
-    try {
-      const res = await fetch(`${apiBase}/api/download?id=${encodeURIComponent(setId)}`);
-      if (res.ok) {
-        arrayBuffer = await res.arrayBuffer();
+    if (apiBase) {
+      try {
+        const res = await fetch(`${apiBase}/api/download?id=${encodeURIComponent(setId)}`);
+        if (res.ok) {
+          arrayBuffer = await res.arrayBuffer();
+        }
+      } catch (e) {
+        console.warn("Local download proxy failed, falling back to direct:", e);
       }
-    } catch (e) {
-      console.warn("Local download proxy failed, falling back to direct:", e);
     }
 
+    // Direct browser fallback 1: osu.direct (CORS: *)
+    if (!arrayBuffer) {
+      try {
+        const res = await fetch(`https://osu.direct/d/${encodeURIComponent(setId)}`);
+        if (res.ok) {
+          arrayBuffer = await res.arrayBuffer();
+        }
+      } catch (e) {
+        console.warn("osu.direct download failed, trying sayobot:", e);
+      }
+    }
+
+    // Direct browser fallback 2: sayobot (CORS: *)
+    if (!arrayBuffer) {
+      try {
+        const res = await fetch(`https://dl.sayobot.cn/beatmaps/download/mini/${encodeURIComponent(setId)}`);
+        if (res.ok) {
+          arrayBuffer = await res.arrayBuffer();
+        }
+      } catch (e) {
+        console.warn("sayobot download failed, trying catboy:", e);
+      }
+    }
+
+    // Direct browser fallback 3: catboy
     if (!arrayBuffer) {
       const res = await fetch(`https://catboy.best/d/${encodeURIComponent(setId)}`);
       if (!res.ok) throw new Error("Download failed: " + res.statusText);
