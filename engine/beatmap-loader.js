@@ -76,27 +76,6 @@ class BeatmapLoader {
         if (window.EngineLog) window.EngineLog.warn("LOADER", `Background preload skipped/failed: ${err.message}`);
       }
     }, 400);
-
-    // 2. Load all saved songs from persistent IndexedDB
-    try {
-      if (typeof BeatmapStorage !== "undefined") {
-        const stored = await BeatmapStorage.loadAllBeatmaps();
-        console.log(`Restoring ${stored.length} persistent beatmaps from IndexedDB...`);
-        for (const item of stored) {
-          if (item.data) {
-            try {
-              await this.importOsz(item.data);
-            } catch (err) {
-              console.warn("Failed to unpack stored beatmap:", item.id, err);
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("Failed loading saved beatmaps from storage:", e);
-    }
-
-    if (this.onSetLoaded) this.onSetLoaded();
   }
 
   /**
@@ -137,6 +116,7 @@ class BeatmapLoader {
     let targetAudioFilename = "";
     let targetBgFilename = "";
     const parsedDiffs = [];
+    let nonStandardDiffsCount = 0;
 
     for (const osuEntry of osuFiles) {
       try {
@@ -148,6 +128,7 @@ class BeatmapLoader {
         // Filter: ONLY accept standard osu! (Mode 0) beatmaps with playable objects
         const mode = parseInt(parsed.general.Mode, 10);
         if (!isNaN(mode) && mode !== 0) {
+          nonStandardDiffsCount++;
           continue;
         }
         if (!parsed.hitObjects || parsed.hitObjects.length === 0) {
@@ -169,6 +150,9 @@ class BeatmapLoader {
     }
 
     if (parsedDiffs.length === 0) {
+      if (nonStandardDiffsCount > 0) {
+        throw new Error("Set contains no osu!standard difficulties (Taiko/Mania/Catch only)");
+      }
       return null;
     }
 
@@ -278,8 +262,11 @@ class BeatmapLoader {
       }).catch(() => {});
     }
 
-    // Prevent duplicate sets with same title
-    const existingIdx = this.beatmapSets.findIndex(s => s.title.toLowerCase() === newSet.title.toLowerCase());
+    // Prevent duplicate sets with same title or ID
+    const existingIdx = this.beatmapSets.findIndex(s =>
+      (s.id && newSet.id && s.id == newSet.id) ||
+      (s.title && newSet.title && s.title.toLowerCase() === newSet.title.toLowerCase())
+    );
     if (existingIdx !== -1) {
       this.beatmapSets[existingIdx] = newSet;
     } else {
@@ -341,77 +328,141 @@ class BeatmapLoader {
   }
 
   /**
-   * Download .osz directly from mirror and persist to IndexedDB
+   * Helper: fetch binary data with strict timeout and live streaming progress
    */
-  async downloadOnlineSet(setId) {
+  async _fetchBufferWithProgress(url, timeoutMs = 12000, onProgress = null) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      }
+
+      const total = parseInt(res.headers.get("content-length") || "0", 10);
+
+      // Stream with progress if ReadableStream reader is supported
+      if (res.body && res.body.getReader) {
+        const reader = res.body.getReader();
+        const chunks = [];
+        let received = 0;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          received += value.length;
+          if (typeof onProgress === "function") {
+            const pct = total > 0 ? Math.min(100, Math.round((received / total) * 100)) : 0;
+            onProgress(pct, received, total);
+          }
+        }
+
+        const fullBuffer = new Uint8Array(received);
+        let offset = 0;
+        for (const c of chunks) {
+          fullBuffer.set(c, offset);
+          offset += c.length;
+        }
+        return fullBuffer.buffer;
+      } else {
+        const buf = await res.arrayBuffer();
+        if (typeof onProgress === "function") onProgress(100, buf.byteLength, buf.byteLength);
+        return buf;
+      }
+    } catch (e) {
+      clearTimeout(timer);
+      throw e;
+    }
+  }
+
+  /**
+   * Download .osz directly from mirror with live progress and persist to IndexedDB
+   */
+  async downloadOnlineSet(setId, onProgress = null) {
+    if (window.EngineLog) {
+      window.EngineLog.info("LOADER", `Starting beatmap download for setId=${setId}...`);
+    }
+
     let arrayBuffer = null;
-
     const apiBase = window.API_BASE || "";
+
+    const candidateUrls = [];
     if (apiBase) {
+      candidateUrls.push({
+        name: "Local Plugin Server",
+        url: `${apiBase}/api/download?id=${encodeURIComponent(setId)}`,
+        timeout: 8000
+      });
+    }
+
+    // 1. osu.direct /api/d endpoint (verified clean CORS on GitHub Pages, fastest mirror)
+    candidateUrls.push({
+      name: "osu.direct (noVideo)",
+      url: `https://osu.direct/api/d/${encodeURIComponent(setId)}?noVideo=1`,
+      timeout: 12000
+    });
+    candidateUrls.push({
+      name: "osu.direct (standard)",
+      url: `https://osu.direct/api/d/${encodeURIComponent(setId)}`,
+      timeout: 14000
+    });
+
+    // 2. Nerinyan mirror (clean CORS, Cloudflare)
+    candidateUrls.push({
+      name: "Nerinyan mirror",
+      url: `https://api.nerinyan.moe/d/${encodeURIComponent(setId)}?noVideo=true`,
+      timeout: 10000
+    });
+
+    // 3. Sayobot mirror (strict 5s timeout to prevent hanging on port 25225)
+    candidateUrls.push({
+      name: "Sayobot mini",
+      url: `https://dl.sayobot.cn/beatmaps/download/mini/${encodeURIComponent(setId)}`,
+      timeout: 5000
+    });
+
+    let lastError = null;
+    for (const mirror of candidateUrls) {
       try {
-        const res = await fetch(`${apiBase}/api/download?id=${encodeURIComponent(setId)}`);
-        if (res.ok) {
-          arrayBuffer = await res.arrayBuffer();
+        if (window.EngineLog) {
+          window.EngineLog.info("LOADER", `Connecting to ${mirror.name}...`);
         }
-      } catch (e) {
-        console.warn("Local download proxy failed, falling back to direct:", e);
+        arrayBuffer = await this._fetchBufferWithProgress(mirror.url, mirror.timeout, onProgress);
+        if (arrayBuffer && arrayBuffer.byteLength > 1000) {
+          if (window.EngineLog) {
+            window.EngineLog.info("LOADER", `Downloaded ${(arrayBuffer.byteLength / 1048576).toFixed(2)} MB from ${mirror.name}`);
+          }
+          break;
+        }
+      } catch (err) {
+        lastError = err;
+        if (window.EngineLog) {
+          window.EngineLog.warn("LOADER", `${mirror.name} failed: ${err.message}`);
+        }
       }
     }
 
-    // Direct browser fallback 1: sayobot primary (verified CORS: *)
-    if (!arrayBuffer) {
-      try {
-        const res = await fetch(`https://dl.sayobot.cn/beatmaps/download/mini/${encodeURIComponent(setId)}`);
-        if (res.ok) {
-          arrayBuffer = await res.arrayBuffer();
-        }
-      } catch (e) {
-        console.warn("sayobot primary failed, trying sayobot secondary:", e);
+    if (!arrayBuffer || arrayBuffer.byteLength <= 1000) {
+      const errMsg = lastError ? lastError.message : "All mirrors unreachable";
+      if (window.EngineLog) {
+        window.EngineLog.error("LOADER", `Download failed for setId=${setId}: ${errMsg}`);
       }
+      throw new Error(`Download failed: ${errMsg}`);
     }
 
-    // Direct browser fallback 2: sayobot secondary (CORS: *)
-    if (!arrayBuffer) {
-      try {
-        const res = await fetch(`https://txy1.sayobot.cn/beatmaps/download/mini/${encodeURIComponent(setId)}`);
-        if (res.ok) {
-          arrayBuffer = await res.arrayBuffer();
-        }
-      } catch (e) {
-        console.warn("sayobot secondary failed, trying osu.direct:", e);
-      }
-    }
-
-    // Direct browser fallback 3: osu.direct
-    if (!arrayBuffer) {
-      try {
-        const res = await fetch(`https://osu.direct/d/${encodeURIComponent(setId)}`);
-        if (res.ok) {
-          arrayBuffer = await res.arrayBuffer();
-        }
-      } catch (e) {
-        console.warn("osu.direct failed:", e);
-      }
-    }
-
-    // Direct browser fallback 3: catboy
-    if (!arrayBuffer) {
-      try {
-        const res = await fetch(`https://catboy.best/d/${encodeURIComponent(setId)}`);
-        if (res.ok) {
-          arrayBuffer = await res.arrayBuffer();
-        }
-      } catch (e) {
-        console.warn("catboy download failed:", e);
-      }
-    }
-
-    if (!arrayBuffer) {
-      throw new Error("Download failed: all mirrors unreachable");
+    if (window.EngineLog) {
+      window.EngineLog.info("LOADER", `Unpacking .osz archive (${(arrayBuffer.byteLength / 1048576).toFixed(2)} MB)...`);
     }
 
     const newSet = await this.importOsz(arrayBuffer);
     if (newSet) {
+      if (setId && (!newSet.id || newSet.id <= 0)) {
+        newSet.id = setId;
+      }
       this.activeSet = newSet;
       this.activeDifficulty = newSet.difficulties[0];
       if (this.audio) {
@@ -421,7 +472,20 @@ class BeatmapLoader {
 
       // Persist to IndexedDB so it never disappears on restart!
       if (typeof BeatmapStorage !== "undefined") {
-        await BeatmapStorage.saveBeatmap(setId, newSet.title, arrayBuffer);
+        try {
+          await BeatmapStorage.saveBeatmap(setId, newSet.title, arrayBuffer);
+          if (window.EngineLog) {
+            window.EngineLog.info("STORAGE", `Beatmap "${newSet.title}" saved to IndexedDB`);
+          }
+        } catch (storageErr) {
+          if (window.EngineLog) {
+            window.EngineLog.warn("STORAGE", `IndexedDB save skipped: ${storageErr.message}`);
+          }
+        }
+      }
+
+      if (window.EngineLog) {
+        window.EngineLog.info("LOADER", `Beatmap ready: "${newSet.title}" (${newSet.difficulties.length} diffs)`);
       }
 
       if (this.onSetLoaded) this.onSetLoaded();

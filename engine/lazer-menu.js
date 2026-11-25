@@ -424,24 +424,39 @@ class LazerUI {
           }
         });
 
-        // 2. Tapping the download button downloads the track
+        // 2. Tapping the download button downloads the track or plays it if installed
         dlBtn.addEventListener("click", async (e) => {
           e.stopPropagation();
           e.preventDefault();
 
-          if (existingSet) {
-            this.loader.activeSet = existingSet;
-            this.loader.activeDifficulty = existingSet.difficulties[0];
-            this.updateDetailsPanel(existingSet, existingSet.difficulties[0]);
-            this.playCurrentBeatmap();
+          if (existingSet || dlBtn.classList.contains("installed")) {
+            const set = existingSet || this.loader.beatmapSets.find(s =>
+              (s.id && s.id == item.id) ||
+              (s.title && s.title.toLowerCase() === (item.title || "").toLowerCase())
+            );
+            if (set) {
+              this.loader.activeSet = set;
+              this.loader.activeDifficulty = set.difficulties[0];
+              this.updateDetailsPanel(set, set.difficulties[0]);
+              this.playCurrentBeatmap();
+            }
             return;
           }
 
           dlBtn.className = "btn-download-osz downloading";
-          dlBtn.innerText = "⏳ Downloading...";
+          dlBtn.innerText = "⏳ 0%";
 
           try {
-            const newSet = await this.loader.downloadOnlineSet(item.id);
+            const onProgress = (pct, loaded, total) => {
+              const mb = (loaded / 1048576).toFixed(1);
+              if (pct > 0) {
+                dlBtn.innerText = `⏳ ${pct}% (${mb} MB)`;
+              } else {
+                dlBtn.innerText = `⏳ ${mb} MB`;
+              }
+            };
+
+            const newSet = await this.loader.downloadOnlineSet(item.id, onProgress);
             if (newSet) {
               dlBtn.className = "btn-download-osz installed";
               dlBtn.innerText = "▶ PLAY NOW";
@@ -450,9 +465,11 @@ class LazerUI {
               this.playPreview(newSet);
             }
           } catch (err) {
-            dlBtn.className = "btn-download-osz";
+            dlBtn.className = "btn-download-osz failed";
             dlBtn.innerText = "❌ Retry";
-            alert("Download failed: " + err.message);
+            if (window.EngineLog) {
+              window.EngineLog.error("UI", `Download failed for "${item.title}": ${err.message}`);
+            }
           }
         });
 

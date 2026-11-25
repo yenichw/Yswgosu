@@ -1109,5 +1109,12 @@ canvas {
   background: rgba(0, 230, 118, 0.25) !important;
   border-color: var(--accent-green) !important;
   color: var(--accent-green) !important;
-  cursor: default;
+  cursor: pointer;
+}
+
+.btn-download-osz.failed {
+  background: rgba(255, 23, 68, 0.25) !important;
+  border-color: var(--accent-red) !important;
+  color: var(--accent-red) !important;
+  cursor: pointer;
 }
