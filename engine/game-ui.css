@@ -1134,3 +1134,12 @@ canvas {
 .warmup-bubble:hover {
   transform: scale(1.15) !important;
 }
+
+/* Permanent safeguard: completely remove bottom-left exit button */
+#main-menu-exit-bar,
+#btn-main-exit {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
