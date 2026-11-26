@@ -9,11 +9,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <link rel="icon" href="favicon.png">
   <link href="main.a37e724502caaf4a68ea.css" rel="stylesheet">
-  <link href="engine/game-ui.css?v=3.1" rel="stylesheet">
+  <link href="engine/game-ui.css?v=3.2" rel="stylesheet">
 
   <!-- Core Diagnostics & Deterministic State Machine (Must load first!) -->
-  <script src="engine/crash-logger.js?v=3.1"></script>
-  <script src="engine/state-machine.js?v=3.1"></script>
+  <script src="engine/crash-logger.js?v=3.2"></script>
+  <script src="engine/state-machine.js?v=3.2"></script>
 
   <!-- Audio Interceptor & Dynamic API Base for Local + GitHub Pages -->
   <script>
@@ -672,39 +672,50 @@
     })();
   </script>
 
-  <!-- Global Main Menu Click Interceptor (Only intercepts when on screen N!) -->
+  <!-- Global Main Menu & Intro Click Interceptor -->
   <script>
     (function initMainMenuClickInterceptor() {
-      function handleMainMenuClick(e) {
-        // Only intercept if Kosu has passed the intro and is actively on the Main Menu (screen N)!
-        if (!window.isKosuOnMainMenu || !window.isKosuOnMainMenu()) return;
-
+      function handleScreenClick(e) {
         const container = document.getElementById("app-container");
         if (container && container.style.display === "flex") return;
 
         const overlay = document.getElementById("exit-overlay");
         if (overlay && overlay.style.display === "flex") return;
 
+        if (window.KosuMain && window.KosuMain.currentScreen) {
+          const s = window.KosuMain.currentScreen;
 
-        // When in main menu, any tap or click opens Song Select!
-        window.openSongSelect();
+          // 1. If on "Click anywhere to play!" screen (We), advance to intro Ve
+          if (s && s.introTrack && s.clickArea && typeof s.clickArea.onclick === "function") {
+            try {
+              s.clickArea.onclick();
+              return;
+            } catch (err) {}
+          }
+
+          // 2. If on Main Menu (N), open Song Select
+          if (s.osuCircle || (s.constructor && s.constructor.name === "N")) {
+            window.openSongSelect();
+            return;
+          }
+        }
       }
 
-      window.addEventListener("click", handleMainMenuClick);
-      window.addEventListener("touchend", handleMainMenuClick, { passive: true });
+      window.addEventListener("click", handleScreenClick);
+      window.addEventListener("touchend", handleScreenClick, { passive: true });
     })();
   </script>
 
   <!-- Local Rhythm Game Engine Scripts -->
   <script src="engine/jszip.min.js"></script>
-  <script src="engine/slider-calc.js?v=3.1"></script>
-  <script src="engine/beatmap-parser.js?v=3.1"></script>
-  <script src="engine/audio-engine.js?v=3.1"></script>
-  <script src="engine/gameplay.js?v=3.1"></script>
-  <script src="engine/renderer.js?v=3.1"></script>
-  <script src="engine/beatmap-storage.js?v=3.1"></script>
-  <script src="engine/beatmap-loader.js?v=3.1"></script>
-  <script src="engine/lazer-menu.js?v=3.1"></script>
+  <script src="engine/slider-calc.js?v=3.2"></script>
+  <script src="engine/beatmap-parser.js?v=3.2"></script>
+  <script src="engine/audio-engine.js?v=3.2"></script>
+  <script src="engine/gameplay.js?v=3.2"></script>
+  <script src="engine/renderer.js?v=3.2"></script>
+  <script src="engine/beatmap-storage.js?v=3.2"></script>
+  <script src="engine/beatmap-loader.js?v=3.2"></script>
+  <script src="engine/lazer-menu.js?v=3.2"></script>
 
   <script>
     window.addEventListener("DOMContentLoaded", async () => {
@@ -768,8 +779,16 @@
       window.addEventListener("keydown", (e) => {
         if (isExiting) return;
         if (container.style.display !== "flex") {
-          if (window.isKosuOnMainMenu && window.isKosuOnMainMenu()) {
-            if (e.code === "Space" || e.code === "Enter") {
+          if (e.code === "Space" || e.code === "Enter") {
+            if (window.KosuMain && window.KosuMain.currentScreen) {
+              const s = window.KosuMain.currentScreen;
+              if (s && s.introTrack && s.clickArea && typeof s.clickArea.onclick === "function") {
+                e.preventDefault();
+                s.clickArea.onclick();
+                return;
+              }
+            }
+            if (window.isKosuOnMainMenu && window.isKosuOnMainMenu()) {
               e.preventDefault();
               window.openSongSelect();
               return;
