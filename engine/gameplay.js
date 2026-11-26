@@ -48,8 +48,9 @@ class GameplayEngine {
     this.count50  = 0;
     this.countMiss = 0;
 
-    // Hit bursts (floating numbers)
+    // Hit bursts and bubble explosions
     this.hitBursts = [];
+    this.hitExplosions = [];
 
     // Pointer state
     this.pointer = { x: 256, y: 192, isDown: false };
@@ -137,6 +138,7 @@ class GameplayEngine {
     this.count50  = 0;
     this.countMiss = 0;
     this.hitBursts = [];
+    this.hitExplosions = [];
     this.currentTime = 0;
     this.isFailed = false;
     this.activeTouches.clear();
@@ -354,10 +356,34 @@ class GameplayEngine {
     // Update floating hit bursts
     for (let i = this.hitBursts.length - 1; i >= 0; i--) {
       const b = this.hitBursts[i];
-      b.life -= deltaTimeMs / 600;
-      b.y -= 0.5;
+      b.life -= deltaTimeMs / 550;
+      b.y -= (deltaTimeMs / 16) * 0.7;
       if (b.life <= 0) {
         this.hitBursts.splice(i, 1);
+      }
+    }
+
+    // Update juicy bubble hit explosions and sparks
+    for (let i = this.hitExplosions.length - 1; i >= 0; i--) {
+      const exp = this.hitExplosions[i];
+      exp.life -= deltaTimeMs / 320; // 320ms duration
+      if (exp.particles) {
+        const step = deltaTimeMs / 16;
+        for (const p of exp.particles) {
+          p.x += p.vx * step;
+          p.y += p.vy * step;
+          p.vx *= 0.93;
+          p.vy *= 0.93;
+          p.alpha = Math.max(0, exp.life);
+        }
+      }
+      if (exp.result === 0) {
+        exp.vy = (exp.vy || 0) + (exp.gravity || 0.18) * (deltaTimeMs / 16);
+        exp.y += exp.vy * (deltaTimeMs / 16);
+        if (exp.shake > 0) exp.shake = Math.max(0, exp.shake - deltaTimeMs / 40);
+      }
+      if (exp.life <= 0) {
+        this.hitExplosions.splice(i, 1);
       }
     }
 
@@ -566,6 +592,48 @@ class GameplayEngine {
       result: result,
       life: 1.0,
     });
+
+    // Create authentic bubble-pop hit explosion with radial sparks
+    const color = (obj && obj.color) ? obj.color : [255, 102, 171];
+    if (result > 0) {
+      const particles = [];
+      const sparkCount = result === 300 ? 8 : (result === 100 ? 6 : 4);
+      for (let p = 0; p < sparkCount; p++) {
+        const ang = (Math.PI * 2 * p) / sparkCount + (Math.random() * 0.4 - 0.2);
+        const spd = (3.0 + Math.random() * 4.0) * (result === 300 ? 1.2 : 1.0);
+        particles.push({
+          x: 0,
+          y: 0,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd,
+          size: 3.5 + Math.random() * 3.0,
+          alpha: 1.0
+        });
+      }
+
+      this.hitExplosions.push({
+        x: hitX,
+        y: hitY,
+        radius: this.circleRadius,
+        color: color,
+        result: result,
+        life: 1.0,
+        particles: particles
+      });
+    } else {
+      // Miss impact: trembling red X falling with gravity
+      this.hitExplosions.push({
+        x: hitX,
+        y: hitY,
+        radius: this.circleRadius,
+        color: [255, 23, 68],
+        result: 0,
+        life: 1.0,
+        vy: -2.0,
+        gravity: 0.22,
+        shake: 6.0
+      });
+    }
   }
 
   getAccuracy() {

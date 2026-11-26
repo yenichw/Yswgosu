@@ -119,8 +119,8 @@ class GameRenderer {
       }
     }
 
-    // 4. Render Hit Bursts (300, 100, 50, Miss)
-    this._drawHitBursts(ctx);
+    // 4. Render Bubble Hit Explosions & Score Badges
+    this._drawHitExplosions(ctx);
 
     // 5. Render Countdown Overlay (3, 2, 1, GO)
     if (this.game.countdownText) {
@@ -290,41 +290,94 @@ class GameRenderer {
     ctx.restore();
   }
 
-  _drawHitBursts(ctx) {
-    if (!this.game || !this.game.hitBursts) return;
+  _drawHitExplosions(ctx) {
+    if (!this.game) return;
+    const explosions = this.game.hitExplosions || [];
+    if (explosions.length === 0) return;
+
     ctx.save();
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
+    for (const exp of explosions) {
+      const sx = this.game.toScreenX(exp.x);
+      const sy = this.game.toScreenY(exp.y);
+      const baseR = (exp.radius || this.game.circleRadius) * (this.game.playfield.scale || 1);
+      const life = Math.max(0, exp.life);
+      const [r, g, b] = exp.color || [255, 102, 171];
 
-    for (const b of this.game.hitBursts) {
-      const x = this.game.toScreenX(b.x);
-      const y = this.game.toScreenY(b.y);
-      const alpha = Math.max(0, b.life);
+      if (exp.result > 0) {
+        const progress = 1 - life;
 
-      if (b.result === 300) {
-        ctx.fillStyle = `rgba(0, 229, 255, ${alpha})`;
-        ctx.font = "bold 26px 'Torus', sans-serif";
-        ctx.shadowColor = "rgba(0, 229, 255, 0.8)";
-        ctx.shadowBlur = 10;
-        ctx.fillText("300", x, y);
-      } else if (b.result === 100) {
-        ctx.fillStyle = `rgba(0, 230, 118, ${alpha})`;
-        ctx.font = "bold 22px 'Torus', sans-serif";
-        ctx.shadowColor = "rgba(0, 230, 118, 0.8)";
-        ctx.shadowBlur = 8;
-        ctx.fillText("100", x, y);
-      } else if (b.result === 50) {
-        ctx.fillStyle = `rgba(255, 145, 0, ${alpha})`;
-        ctx.font = "bold 18px 'Torus', sans-serif";
-        ctx.shadowColor = "rgba(255, 145, 0, 0.8)";
-        ctx.shadowBlur = 6;
-        ctx.fillText("50", x, y);
+        // 1. Core Pop Flash (bright glowing sphere expanding and rapidly fading)
+        if (progress < 0.6) {
+          const coreProgress = progress / 0.6;
+          const flashRadius = baseR * (0.85 + coreProgress * 0.4);
+          const flashAlpha = (1 - coreProgress) * 0.75;
+          ctx.beginPath();
+          ctx.arc(sx, sy, flashRadius, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+          ctx.shadowColor = `rgba(${r}, ${g}, ${b}, 0.9)`;
+          ctx.shadowBlur = 16;
+          ctx.fill();
+        }
+
+        // 2. Juicy Bubble Pop Shockwave Ring (expands rapidly like popping bubble)
+        const ringRadius = baseR * (1.0 + progress * 0.85);
+        const ringWidth = Math.max(0.5, 4.5 * life);
+        ctx.beginPath();
+        ctx.arc(sx, sy, ringRadius, 0, Math.PI * 2);
+        ctx.lineWidth = ringWidth;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${life * 0.95})`;
+        ctx.shadowColor = `rgba(${r}, ${g}, ${b}, 0.9)`;
+        ctx.shadowBlur = 14;
+        ctx.stroke();
+
+        // 3. Radial Bubble Pop Sparks (particles shooting outwards)
+        if (exp.particles) {
+          const scale = this.game.playfield.scale || 1;
+          for (const p of exp.particles) {
+            ctx.beginPath();
+            ctx.arc(sx + p.x * scale, sy + p.y * scale, Math.max(1, p.size * life), 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${p.alpha})`;
+            ctx.shadowColor = `rgba(255, 255, 255, 0.8)`;
+            ctx.shadowBlur = 6;
+            ctx.fill();
+          }
+        }
+
+        // 4. Score Judgement Floating Badge (300 / 100 / 50)
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const floatY = sy - (progress * 18);
+        const popScale = 1.0 + Math.sin(progress * Math.PI) * 0.25;
+
+        if (exp.result === 300) {
+          ctx.font = `900 ${Math.floor(28 * popScale)}px 'Torus', sans-serif`;
+          ctx.fillStyle = `rgba(0, 229, 255, ${life})`;
+          ctx.shadowColor = "rgba(0, 229, 255, 0.95)";
+          ctx.shadowBlur = 12;
+          ctx.fillText("300", sx, floatY);
+        } else if (exp.result === 100) {
+          ctx.font = `900 ${Math.floor(24 * popScale)}px 'Torus', sans-serif`;
+          ctx.fillStyle = `rgba(0, 230, 118, ${life})`;
+          ctx.shadowColor = "rgba(0, 230, 118, 0.9)";
+          ctx.shadowBlur = 10;
+          ctx.fillText("100", sx, floatY);
+        } else if (exp.result === 50) {
+          ctx.font = `900 ${Math.floor(20 * popScale)}px 'Torus', sans-serif`;
+          ctx.fillStyle = `rgba(255, 145, 0, ${life})`;
+          ctx.shadowColor = "rgba(255, 145, 0, 0.85)";
+          ctx.shadowBlur = 8;
+          ctx.fillText("50", sx, floatY);
+        }
       } else {
-        ctx.fillStyle = `rgba(255, 23, 68, ${alpha})`;
-        ctx.font = "bold 30px 'Torus', sans-serif";
-        ctx.shadowColor = "rgba(255, 23, 68, 0.8)";
-        ctx.shadowBlur = 10;
-        ctx.fillText("✕", x, y);
+        // Miss: Trembling red cross dropping with gravity
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const shakeX = (Math.random() - 0.5) * (exp.shake || 0);
+        ctx.font = "900 32px 'Torus', sans-serif";
+        ctx.fillStyle = `rgba(255, 23, 68, ${life})`;
+        ctx.shadowColor = "rgba(255, 23, 68, 0.95)";
+        ctx.shadowBlur = 14;
+        ctx.fillText("✕", sx + shakeX, sy);
       }
     }
     ctx.restore();
@@ -349,7 +402,7 @@ class GameRenderer {
     if (!this.game || !this.game.pointer) return;
     const curX = this.game.toScreenX(this.game.pointer.x);
     const curY = this.game.toScreenY(this.game.pointer.y);
-    const isDown = this.game.pointer.down;
+    const isDown = !!(this.game.pointer && this.game.pointer.isDown);
 
     const now = performance.now();
     this.cursorTrail.push({ x: curX, y: curY, time: now });

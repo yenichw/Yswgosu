@@ -6,11 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <link rel="icon" href="favicon.png">
   <link href="main.a37e724502caaf4a68ea.css" rel="stylesheet">
-  <link href="engine/game-ui.css?v=2.2" rel="stylesheet">
+  <link href="engine/game-ui.css?v=2.3" rel="stylesheet">
 
   <!-- Core Diagnostics & Deterministic State Machine (Must load first!) -->
-  <script src="engine/crash-logger.js?v=2.2"></script>
-  <script src="engine/state-machine.js?v=2.2"></script>
+  <script src="engine/crash-logger.js?v=2.3"></script>
+  <script src="engine/state-machine.js?v=2.3"></script>
 
   <!-- Audio Interceptor & Dynamic API Base for Local + GitHub Pages -->
   <script>
@@ -334,8 +334,13 @@
 
       <div class="game-hud" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 24px; box-sizing: border-box;">
         <div class="hud-top" style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
-          <div class="hud-hp-bar-container" style="width: 250px; height: 12px; background: rgba(255,255,255,0.15); border-radius: 6px; overflow: hidden; border: 1.5px solid rgba(255,255,255,0.3); box-shadow: 0 0 10px rgba(0,0,0,0.5);">
-            <div class="hud-hp-fill" id="hud-hp-fill" style="width: 100%; height: 100%; background: linear-gradient(90deg, #ff1744 0%, #ffd600 50%, #00e676 100%); transition: width 0.08s linear;"></div>
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <div class="hud-hp-bar-container" style="width: 220px; height: 12px; background: rgba(255,255,255,0.15); border-radius: 6px; overflow: hidden; border: 1.5px solid rgba(255,255,255,0.3); box-shadow: 0 0 10px rgba(0,0,0,0.5);">
+              <div class="hud-hp-fill" id="hud-hp-fill" style="width: 100%; height: 100%; background: linear-gradient(90deg, #ff1744 0%, #ffd600 50%, #00e676 100%); transition: width 0.08s linear;"></div>
+            </div>
+            <button id="hud-pause-btn" style="pointer-events: auto; padding: 5px 12px; background: rgba(20,14,25,0.7); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.25); border-radius: 16px; color: #ff80ab; font-weight: 700; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.4);">
+              <span>⏸</span> <span>PAUSE</span>
+            </button>
           </div>
           <div style="display: flex; gap: 28px; align-items: baseline;">
             <div class="accuracy-display" id="hud-accuracy" style="font-size: 1.8rem; font-weight: 700; color: #ff66ab; text-shadow: 0 0 10px rgba(255,102,171,0.5);">100.00%</div>
@@ -345,6 +350,48 @@
 
         <div class="hud-bottom-left">
           <div class="combo-counter" id="hud-combo" style="font-size: 3.5rem; font-weight: 900; color: #ffd600; text-shadow: 0 0 15px rgba(255,214,0,0.6);">0x</div>
+        </div>
+      </div>
+
+      <!-- Lead-In Warm-up & Tips Overlay (Pre-song buffer) -->
+      <div id="gameplay-leadin-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 40; pointer-events: auto; background: radial-gradient(circle at center, rgba(16, 10, 24, 0.7) 0%, rgba(10, 6, 15, 0.92) 100%); flex-direction: column; align-items: center; justify-content: space-between; padding: 36px 20px; box-sizing: border-box; font-family: var(--font-main);">
+        <div style="text-align: center; margin-top: 10px;">
+          <div id="leadin-title" style="font-size: 1.8rem; font-weight: 900; color: #ffffff; text-shadow: 0 0 15px rgba(255,102,171,0.6); letter-spacing: 0.5px;">Song Title</div>
+          <div id="leadin-artist" style="font-size: 1.05rem; color: #b3a5c4; font-weight: 600; margin-top: 4px;">Artist Name • [Difficulty]</div>
+        </div>
+
+        <!-- Interactive Warm-up Target Area -->
+        <div id="leadin-warmup-area" style="position: relative; width: 100%; max-width: 580px; height: 220px; border: 1.5px dashed rgba(255, 102, 171, 0.35); border-radius: 18px; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.02); overflow: hidden;">
+          <div id="leadin-warmup-hint" style="position: absolute; top: 12px; font-size: 0.85rem; color: #ff80ab; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; pointer-events: none;">✨ Warm-up clicks (Pop the bubbles!)</div>
+        </div>
+
+        <!-- Bottom bar: Tips + Countdown + Skip -->
+        <div style="width: 100%; max-width: 650px; display: flex; flex-direction: column; align-items: center; gap: 14px;">
+          <div id="leadin-tip" style="font-size: 0.95rem; color: #00e5ff; font-weight: 600; text-align: center; background: rgba(0, 229, 255, 0.08); padding: 8px 18px; border-radius: 20px; border: 1px solid rgba(0, 229, 255, 0.2);">💡 Tip: Alternate between Z and X keys to tap fast streams smoothly!</div>
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <div id="leadin-countdown" style="font-size: 1.4rem; font-weight: 800; color: #ffd600; text-shadow: 0 0 12px rgba(255,214,0,0.6);">Starting in 3s...</div>
+            <button id="btn-leadin-skip" style="padding: 10px 24px; border-radius: 24px; background: linear-gradient(135deg, #ff66ab 0%, #aa00ff 100%); border: 1px solid rgba(255,255,255,0.4); color: #fff; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 0 15px rgba(255,102,171,0.5); display: flex; align-items: center; gap: 6px;">
+              <span>⏩ Skip Intro</span> <span style="opacity: 0.75; font-size: 0.8rem;">[Space]</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lazer-style Gameplay Pause Overlay -->
+      <div id="gameplay-pause-overlay" class="pause-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 55; background: rgba(14, 8, 20, 0.88); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); flex-direction: column; align-items: center; justify-content: center; gap: 20px;">
+        <div style="font-size: 4.2rem; font-weight: 900; color: #ffd600; text-shadow: 0 0 35px rgba(255,214,0,0.8); letter-spacing: 6px; font-family: var(--font-main);">PAUSED</div>
+        <div id="pause-meta" style="font-size: 1.15rem; color: #b3a5c4; font-weight: 600;">Song Title • [Difficulty]</div>
+        
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 15px; width: 280px;">
+          <button class="btn-lazer primary" id="btn-pause-resume" style="width: 100%; padding: 14px 20px; font-size: 1.15rem; font-weight: 800; cursor: pointer; border-radius: 10px; box-shadow: 0 4px 18px rgba(255,102,171,0.6); display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <span>▶ Continue</span> <span style="font-size: 0.8rem; opacity: 0.8;">[Esc]</span>
+          </button>
+          <button class="btn-lazer" id="btn-pause-retry" style="width: 100%; padding: 12px 20px; font-size: 1.05rem; font-weight: 700; cursor: pointer; border-radius: 10px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <span>🔄 Retry</span> <span style="font-size: 0.8rem; opacity: 0.7;">[R]</span>
+          </button>
+          <button class="btn-lazer" id="btn-pause-exit" style="width: 100%; padding: 12px 20px; font-size: 1.05rem; font-weight: 700; cursor: pointer; border-radius: 10px; background: rgba(255,23,68,0.2); border: 1px solid rgba(255,23,68,0.4); color: #ff80ab; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <span>◀ Song Select</span>
+          </button>
         </div>
       </div>
 
@@ -619,14 +666,14 @@
 
   <!-- Local Rhythm Game Engine Scripts -->
   <script src="engine/jszip.min.js"></script>
-  <script src="engine/slider-calc.js?v=2.2"></script>
-  <script src="engine/beatmap-parser.js?v=2.2"></script>
-  <script src="engine/audio-engine.js?v=2.2"></script>
-  <script src="engine/gameplay.js?v=2.2"></script>
-  <script src="engine/renderer.js?v=2.2"></script>
-  <script src="engine/beatmap-storage.js?v=2.2"></script>
-  <script src="engine/beatmap-loader.js?v=2.2"></script>
-  <script src="engine/lazer-menu.js?v=2.2"></script>
+  <script src="engine/slider-calc.js?v=2.3"></script>
+  <script src="engine/beatmap-parser.js?v=2.3"></script>
+  <script src="engine/audio-engine.js?v=2.3"></script>
+  <script src="engine/gameplay.js?v=2.3"></script>
+  <script src="engine/renderer.js?v=2.3"></script>
+  <script src="engine/beatmap-storage.js?v=2.3"></script>
+  <script src="engine/beatmap-loader.js?v=2.3"></script>
+  <script src="engine/lazer-menu.js?v=2.3"></script>
 
   <script>
     window.addEventListener("DOMContentLoaded", async () => {
@@ -753,6 +800,11 @@
       btnBackToMenu.addEventListener("touchend", backToMainMenu);
 
       window.handleAndroidBack = function() {
+        if (ui && ui.screens && ui.screens.gameplay && ui.screens.gameplay.classList.contains("active")) {
+          // If on gameplay screen, open pause menu or return to song select (NEVER drop to intro osu logo!)
+          ui.togglePause();
+          return;
+        }
         if (container.style.display === "flex") {
           backToMainMenu();
         } else {

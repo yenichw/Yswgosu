@@ -577,6 +577,11 @@ class LazerUI {
       try { window.pauseKosuAudio(); } catch (e) {}
     }
 
+    // Hide any previous overlays
+    const pauseOverlay = document.getElementById("gameplay-pause-overlay");
+    if (pauseOverlay) pauseOverlay.style.display = "none";
+    if (this.failOverlay) this.failOverlay.style.display = "none";
+
     this.audio.resume();
 
     // Attach audio buffer and fallback HTML5 audio blob URL
@@ -587,13 +592,177 @@ class LazerUI {
       this.game.loadBeatmap(diff);
       this.switchScreen("gameplay");
       if (this.renderer) this.renderer._resize();
-      this.game.start();
+
+      // Check first note timing for interactive warm-up buffer
+      const firstObj = (diff.hitObjects && diff.hitObjects[0]) ? diff.hitObjects[0] : null;
+      const firstNoteTime = firstObj ? firstObj.time : 3000;
+
+      if (firstNoteTime >= 2200) {
+        this._startWarmupLeadIn(set, diff, firstNoteTime);
+      } else {
+        this.game.start();
+      }
     } catch (err) {
       if (window.EngineLog) {
         window.EngineLog.crash(err, "Failed to start gameplay");
       }
     }
   }
+
+  _startWarmupLeadIn(set, diff, firstNoteTime) {
+    const leadin = document.getElementById("gameplay-leadin-overlay");
+    if (!leadin) {
+      this.game.start();
+      return;
+    }
+
+    const titleEl = document.getElementById("leadin-title");
+    const artistEl = document.getElementById("leadin-artist");
+    const tipEl = document.getElementById("leadin-tip");
+    const countdownEl = document.getElementById("leadin-countdown");
+    const warmupArea = document.getElementById("leadin-warmup-area");
+
+    if (titleEl) titleEl.innerText = set ? (set.title || "Unknown Title") : "Unknown Title";
+    if (artistEl) artistEl.innerText = `${set ? set.artist : "Unknown"} • [${diff.metadata ? diff.metadata.Version : "Normal"}]`;
+
+    // Authentic gameplay tips
+    const tips = [
+      "💡 Tip: Alternate between Z and X keys to tap streams and fast bursts smoothly!",
+      "💡 Tip: Track slider balls with your cursor or finger to maintain combo.",
+      "💡 Tip: Hit circles right when the outer approach ring touches the circle border.",
+      "💡 Tip: Press Esc at any time to open the Pause menu (Resume, Retry, Song Select).",
+      "💡 Tip: On touchscreens, use multiple fingers simultaneously to hit notes!",
+      "💡 Tip: Combo multipliers drastically increase your total score!",
+      "💡 Tip: Clear spinners by making small, fast circular motions around the center.",
+      "💡 Tip: Maintain high accuracy (300s) to achieve SS and S grades!",
+      "💡 Tip: Use NoFail mod in the mod menu if a track feels too challenging.",
+      "💡 Tip: Download new beatmaps directly using the top search bar!"
+    ];
+    if (tipEl) {
+      tipEl.innerText = tips[Math.floor(Math.random() * tips.length)];
+    }
+
+    // Spawn interactive warm-up bubbles
+    if (warmupArea) {
+      const oldBubbles = warmupArea.querySelectorAll(".warmup-bubble");
+      oldBubbles.forEach(b => b.remove());
+
+      const colors = ["#ff66ab", "#00e5ff", "#ffd600", "#00e676"];
+      for (let i = 0; i < 4; i++) {
+        const bubble = document.createElement("div");
+        bubble.className = "warmup-bubble";
+        const col = colors[i % colors.length];
+        bubble.style.cssText = `
+          position: absolute;
+          width: 58px;
+          height: 58px;
+          border-radius: 50%;
+          background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.9) 0%, ${col} 70%);
+          border: 2.5px solid #ffffff;
+          box-shadow: 0 0 16px ${col};
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #ffffff;
+          font-weight: 900;
+          font-size: 0.75rem;
+          cursor: pointer;
+          user-select: none;
+          touch-action: none;
+          transition: transform 0.15s ease-out, opacity 0.2s ease-out;
+          left: ${12 + (i % 2) * 45 + Math.random() * 20}%;
+          top: ${20 + Math.floor(i / 2) * 40 + Math.random() * 15}%;
+        `;
+        bubble.innerText = "POP!";
+
+        const pop = (e) => {
+          if (e) { e.preventDefault(); e.stopPropagation(); }
+          this.audio.playHitSound(0);
+          bubble.style.transform = "scale(1.45)";
+          bubble.style.opacity = "0";
+          bubble.style.pointerEvents = "none";
+          setTimeout(() => {
+            if (leadin && leadin.style.display === "flex") {
+              bubble.style.left = `${15 + Math.random() * 70}%`;
+              bubble.style.top = `${20 + Math.random() * 55}%`;
+              bubble.style.transform = "scale(1)";
+              bubble.style.opacity = "1";
+              bubble.style.pointerEvents = "auto";
+            }
+          }, 600);
+        };
+        bubble.addEventListener("pointerdown", pop);
+        warmupArea.appendChild(bubble);
+      }
+    }
+
+    leadin.style.display = "flex";
+
+    // Start music immediately (intro starts playing seamlessly)
+    this.game.start();
+
+    // Lead-in countdown loop
+    const leadInDurationSec = Math.min(6, Math.max(2.2, firstNoteTime / 1000));
+    const startTime = performance.now();
+
+    if (this._leadInInterval) clearInterval(this._leadInInterval);
+    this._leadInInterval = setInterval(() => {
+      const elapsed = (performance.now() - startTime) / 1000;
+      const remaining = Math.max(0, leadInDurationSec - elapsed);
+
+      if (countdownEl) {
+        countdownEl.innerText = `Starting in ${remaining.toFixed(1)}s...`;
+      }
+
+      if (remaining <= 0.3) {
+        this._skipLeadIn();
+      }
+    }, 100);
+
+    const btnSkip = document.getElementById("btn-leadin-skip");
+    if (btnSkip) {
+      btnSkip.onclick = () => this._skipLeadIn();
+    }
+  }
+
+  _skipLeadIn() {
+    if (this._leadInInterval) {
+      clearInterval(this._leadInInterval);
+      this._leadInInterval = null;
+    }
+    const leadin = document.getElementById("gameplay-leadin-overlay");
+    if (leadin) leadin.style.display = "none";
+  }
+
+  togglePause(forceState) {
+    if (!this.screens.gameplay || !this.screens.gameplay.classList.contains("active")) return;
+    const pauseOverlay = document.getElementById("gameplay-pause-overlay");
+    const leadinOverlay = document.getElementById("gameplay-leadin-overlay");
+
+    if (leadinOverlay && leadinOverlay.style.display === "flex") {
+      this._skipLeadIn();
+      return;
+    }
+
+    const isCurrentlyPaused = this.game.isPaused || (pauseOverlay && pauseOverlay.style.display === "flex");
+    const willPause = forceState !== undefined ? forceState : !isCurrentlyPaused;
+
+    if (willPause) {
+      if (!this.game.isPaused) this.game.pause();
+      if (pauseOverlay) {
+        const meta = document.getElementById("pause-meta");
+        if (meta && this.loader.activeSet && this.loader.activeDifficulty) {
+          const v = this.loader.activeDifficulty.metadata ? this.loader.activeDifficulty.metadata.Version : "Normal";
+          meta.innerText = `${this.loader.activeSet.title} • [${v}]`;
+        }
+        pauseOverlay.style.display = "flex";
+      }
+    } else {
+      if (pauseOverlay) pauseOverlay.style.display = "none";
+      if (this.game.isPaused) this.game.pause();
+    }
+  }
+
 
   // ===================================================================
   //  EVENT BINDINGS
@@ -712,19 +881,52 @@ class LazerUI {
         this.game.handlePointerUp(e.pointerId);
       });
 
-      // Keyboard bindings (Z, X keys) - Ignore auto-repeat to prevent phantom scoring!
+      // High-precision pointer tracking on window to eliminate mouse lag
+      window.addEventListener("pointermove", (e) => {
+        if (!this.screens.gameplay || !this.screens.gameplay.classList.contains("active")) return;
+        const rect = canvas.getBoundingClientRect();
+        this.game.handlePointerMove("mouse", e.clientX - rect.left, e.clientY - rect.top);
+      }, { passive: true });
+
+      // Keyboard bindings (Z, X, Esc, Space, R)
       window.addEventListener("keydown", (e) => {
-        if (e.repeat) return; // Ignore OS key-repeat so holding key doesn't fire 30 hits/sec
+        if (!this.screens.gameplay || !this.screens.gameplay.classList.contains("active")) return;
+        if (e.repeat) return;
+
+        // Fast zero-latency hit registration
         if (e.code === "KeyZ" || e.code === "KeyX") {
           e.preventDefault();
           const keyId = e.code === "KeyZ" ? "key_z" : "key_x";
-          const screenX = this.game.toScreenX(this.game.pointer.x);
-          const screenY = this.game.toScreenY(this.game.pointer.y);
-          this.game.handlePointerDown(keyId, screenX, screenY);
-        } else if (e.code === "Escape") {
-          if (this.game.isRunning) {
+          this.game._tryHitAt(this.game.pointer.x, this.game.pointer.y);
+          this.game.pointer.isDown = true;
+          this.game.activeTouches.set(keyId, { x: this.game.pointer.x, y: this.game.pointer.y });
+        }
+        else if (e.code === "Space") {
+          const leadin = document.getElementById("gameplay-leadin-overlay");
+          if (leadin && leadin.style.display === "flex") {
+            e.preventDefault();
+            this._skipLeadIn();
+          }
+        }
+        else if (e.code === "KeyR") {
+          const pauseOverlay = document.getElementById("gameplay-pause-overlay");
+          if (pauseOverlay && pauseOverlay.style.display === "flex") {
+            e.preventDefault();
+            pauseOverlay.style.display = "none";
+            this.playCurrentBeatmap();
+          }
+        }
+        else if (e.code === "Escape") {
+          e.preventDefault();
+          const pauseOverlay = document.getElementById("gameplay-pause-overlay");
+          if (pauseOverlay && pauseOverlay.style.display === "flex") {
+            // Already in pause menu -> return to Song Select cleanly
+            pauseOverlay.style.display = "none";
             this.game.stop();
             this.switchScreen("songSelect");
+          } else {
+            // In gameplay -> open pause menu
+            this.togglePause();
           }
         }
       });
@@ -738,17 +940,41 @@ class LazerUI {
       });
     }
 
-    // 5. HUD Pause & Exit buttons (with touch & pointer support)
+    // 5. In-Game Pause Overlay Bindings
+    const btnPauseResume = document.getElementById("btn-pause-resume");
+    if (btnPauseResume) {
+      btnPauseResume.addEventListener("click", () => this.togglePause(false));
+    }
+
+    const btnPauseRetry = document.getElementById("btn-pause-retry");
+    if (btnPauseRetry) {
+      btnPauseRetry.addEventListener("click", () => {
+        const p = document.getElementById("gameplay-pause-overlay");
+        if (p) p.style.display = "none";
+        this.playCurrentBeatmap();
+      });
+    }
+
+    const btnPauseExit = document.getElementById("btn-pause-exit");
+    if (btnPauseExit) {
+      btnPauseExit.addEventListener("click", () => {
+        const p = document.getElementById("gameplay-pause-overlay");
+        if (p) p.style.display = "none";
+        this.game.stop();
+        this.switchScreen("songSelect");
+      });
+    }
+
+    // 6. HUD Pause Button in top-left
     const pauseBtn = document.getElementById("hud-pause-btn");
     if (pauseBtn) {
-      const togglePause = (e) => {
+      const handlePauseTap = (e) => {
         if (e) { e.preventDefault(); e.stopPropagation(); }
-        this.game.pause();
-        pauseBtn.innerText = this.game.isPaused ? "Resume" : "Pause";
+        this.togglePause();
       };
-      pauseBtn.addEventListener("pointerdown", togglePause);
-      pauseBtn.addEventListener("touchend", togglePause);
-      pauseBtn.addEventListener("click", togglePause);
+      pauseBtn.addEventListener("pointerdown", handlePauseTap);
+      pauseBtn.addEventListener("touchend", handlePauseTap);
+      pauseBtn.addEventListener("click", handlePauseTap);
     }
 
     const exitBtn = document.getElementById("hud-exit-btn");
