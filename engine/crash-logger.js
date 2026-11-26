@@ -58,91 +58,153 @@
         -webkit-backdrop-filter: blur(14px);
         z-index: 2147483647;
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 24px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        padding: 20px;
         box-sizing: border-box;
-        font-family: 'Torus', -apple-system, sans-serif;
-        color: #ffffff;
+      `;
+
+      modal.innerHTML = `
+        <div style="
+          background: #180a13;
+          border: 1.5px solid #ff1744;
+          box-shadow: 0 0 35px rgba(255, 23, 68, 0.45);
+          border-radius: 16px;
+          max-width: 680px;
+          width: 100%;
+          color: #ffffff;
+          padding: 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        ">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 1.6rem;">⚠️</span>
+              <span style="font-size: 1.3rem; font-weight: 800; color: #ff5252; letter-spacing: 0.5px;">Yswgosu Engine Diagnostics</span>
+            </div>
+            <span id="crash-context-badge" style="background: rgba(255, 23, 68, 0.2); color: #ff80ab; font-size: 0.75rem; padding: 4px 10px; border-radius: 12px; font-weight: 600;">Crash</span>
+          </div>
+
+          <div style="background: rgba(255, 23, 68, 0.08); border-left: 4px solid #ff1744; padding: 12px 14px; border-radius: 4px;">
+            <div id="crash-message" style="font-weight: 700; color: #ffcdd2; font-size: 0.95rem; word-break: break-word;"></div>
+          </div>
+
+          <div style="font-size: 0.8rem; color: #ff80ab; text-transform: uppercase; font-weight: 700; letter-spacing: 0.8px;">Stack Trace</div>
+          <pre id="crash-stack" style="
+            background: #0d040a;
+            border: 1px solid rgba(255, 23, 68, 0.25);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 0;
+            font-family: monospace;
+            font-size: 0.78rem;
+            color: #ef9a9a;
+            max-height: 140px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+          "></pre>
+
+          <div style="font-size: 0.8rem; color: #00e5ff; text-transform: uppercase; font-weight: 700; letter-spacing: 0.8px;">Recent Sequence Events</div>
+          <pre id="crash-history" style="
+            background: #0d040a;
+            border: 1px solid rgba(0, 229, 255, 0.25);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 0;
+            font-family: monospace;
+            font-size: 0.72rem;
+            color: #80deea;
+            max-height: 120px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+          "></pre>
+
+          <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+            <button id="btn-copy-crash-log" style="
+              background: rgba(255, 255, 255, 0.08);
+              border: 1px solid rgba(255, 255, 255, 0.2);
+              color: #ffffff;
+              padding: 9px 18px;
+              border-radius: 8px;
+              font-weight: 600;
+              cursor: pointer;
+            ">📋 Copy Log</button>
+            <button id="btn-dismiss-crash" style="
+              background: rgba(255, 255, 255, 0.12);
+              border: 1px solid rgba(255, 255, 255, 0.3);
+              color: #ffffff;
+              padding: 9px 18px;
+              border-radius: 8px;
+              font-weight: 600;
+              cursor: pointer;
+            ">Dismiss</button>
+            <button id="btn-restart-engine" style="
+              background: #ff1744;
+              border: none;
+              color: #ffffff;
+              padding: 9px 20px;
+              border-radius: 8px;
+              font-weight: 700;
+              cursor: pointer;
+              box-shadow: 0 4px 14px rgba(255, 23, 68, 0.4);
+            ">🔄 Restart</button>
+          </div>
+        </div>
       `;
       document.body.appendChild(modal);
-    }
 
-    const errMessage = err ? (err.message || String(err)) : "Unknown Error";
-    const errStack = err && err.stack ? err.stack : "No stack trace available";
-    const recentLogs = window.__ENGINE_LOGS__.slice(-8).map(l => `[${l.time}][${l.level}][${l.category}] ${l.message}`).join("\n");
-
-    modal.innerHTML = `
-      <div style="background: rgba(28, 16, 26, 0.95); border: 2px solid #ff1744; border-radius: 14px; max-width: 720px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 24px; box-shadow: 0 0 40px rgba(255, 23, 68, 0.6); box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255, 23, 68, 0.3); padding-bottom: 12px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 1.8rem;">⚠️</span>
-            <span style="font-size: 1.4rem; font-weight: 800; color: #ff1744; letter-spacing: 1px;">Yswgosu Engine Diagnostics</span>
-          </div>
-          <span style="font-size: 0.85rem; color: #ff80ab; background: rgba(255, 23, 68, 0.2); padding: 4px 10px; border-radius: 6px; font-weight: 700;">${context}</span>
-        </div>
-
-        <div style="font-size: 1.05rem; font-weight: 700; color: #ffffff; background: rgba(255, 23, 68, 0.15); padding: 12px; border-radius: 8px; border-left: 4px solid #ff1744;">
-          ${escapeHtml(errMessage)}
-        </div>
-
-        <div>
-          <div style="font-size: 0.82rem; font-weight: 700; color: #b3a5c4; margin-bottom: 4px; text-transform: uppercase;">Stack Trace</div>
-          <pre style="background: #0a060f; color: #ff80ab; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 0.78rem; overflow-x: auto; max-height: 140px; margin: 0; white-space: pre-wrap; word-break: break-all;">${escapeHtml(errStack)}</pre>
-        </div>
-
-        <div>
-          <div style="font-size: 0.82rem; font-weight: 700; color: #b3a5c4; margin-bottom: 4px; text-transform: uppercase;">Recent Sequence Events</div>
-          <pre style="background: #0a060f; color: #00e5ff; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 0.75rem; overflow-x: auto; max-height: 120px; margin: 0; white-space: pre-wrap;">${escapeHtml(recentLogs)}</pre>
-        </div>
-
-        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
-          <button id="btn-copy-crash-log" style="padding: 10px 18px; border-radius: 8px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3); color: #fff; font-weight: 600; cursor: pointer;">📋 Copy Log</button>
-          <button id="btn-close-crash-modal" style="padding: 10px 18px; border-radius: 8px; background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: #fff; font-weight: 600; cursor: pointer;">Dismiss</button>
-          <button id="btn-reload-safe" style="padding: 10px 22px; border-radius: 8px; background: #ff1744; border: none; color: #fff; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(255, 23, 68, 0.5);">🔄 Restart</button>
-        </div>
-      </div>
-    `;
-
-    modal.style.display = "flex";
-
-    const btnCopy = document.getElementById("btn-copy-crash-log");
-    if (btnCopy) {
-      btnCopy.onclick = () => {
-        const fullReport = `=== Yswgosu Crash Report ===\nContext: ${context}\nError: ${errMessage}\n\nStack:\n${errStack}\n\nRecent Logs:\n${recentLogs}`;
-        navigator.clipboard.writeText(fullReport).then(() => {
-          btnCopy.innerText = "✓ Copied!";
-          setTimeout(() => { btnCopy.innerText = "📋 Copy Log"; }, 2000);
-        }).catch(() => {
-          alert("Log copied to console!");
-          console.log(fullReport);
+      document.getElementById("btn-restart-engine").onclick = () => window.location.reload();
+      document.getElementById("btn-dismiss-crash").onclick = () => { modal.style.display = "none"; };
+      document.getElementById("btn-copy-crash-log").onclick = () => {
+        const fullLog = `[Yswgosu Crash Log]\nContext: ${context}\nError: ${err ? (err.message || err) : "Unknown"}\nStack:\n${err ? err.stack : "None"}\n\nTimeline:\n` +
+          window.__ENGINE_LOGS__.map(l => `[${l.time}][${l.level}][${l.category}] ${l.message}`).join("\n");
+        navigator.clipboard.writeText(fullLog).then(() => {
+          document.getElementById("btn-copy-crash-log").innerText = "✓ Copied!";
+          setTimeout(() => { document.getElementById("btn-copy-crash-log").innerText = "📋 Copy Log"; }, 2000);
         });
       };
     }
 
-    const btnClose = document.getElementById("btn-close-crash-modal");
-    if (btnClose) {
-      btnClose.onclick = () => { modal.style.display = "none"; };
-    }
-
-    const btnReload = document.getElementById("btn-reload-safe");
-    if (btnReload) {
-      btnReload.onclick = () => { window.location.reload(); };
-    }
+    modal.style.display = "flex";
+    document.getElementById("crash-context-badge").innerText = context;
+    document.getElementById("crash-message").innerText = err ? (err.message || String(err)) : "Unknown runtime exception occurred.";
+    document.getElementById("crash-stack").innerText = err ? (err.stack || "No JS stack trace available.") : "None";
+    document.getElementById("crash-history").innerText = window.__ENGINE_LOGS__.slice(-15).map(l => `[${l.time}][${l.level}][${l.category}] ${l.message}`).join("\n");
   }
 
   function escapeHtml(str) {
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function isNonFatal(msg) {
+    if (!msg) return false;
+    const s = String(msg).toLowerCase();
+    return (
+      s.includes("audiocontext") ||
+      s.includes("play()") ||
+      s.includes("interrupted") ||
+      s.includes("user didn't interact") ||
+      s.includes("the operation was aborted") ||
+      s.includes("failed to load") ||
+      s.includes("loadimagebitmap") ||
+      s.includes("failed to fetch") ||
+      s.includes("503") ||
+      s.includes("404") ||
+      s.includes("networkerror") ||
+      s.includes("seasonal backgrounds") ||
+      s.includes("loader.load") ||
+      s.includes("resizeloop") ||
+      s.includes("resizeobserver loop")
+    );
   }
 
   // Hook global unhandled errors
   window.addEventListener("error", (e) => {
     const msg = String(e.error || e.message || "");
-    if (msg.includes("ResizeObserver loop") || msg.includes("AudioContext")) {
+    if (isNonFatal(msg)) {
       logEvent("WARN", "RUNTIME", msg);
       return;
     }
@@ -152,14 +214,8 @@
   window.addEventListener("unhandledrejection", (e) => {
     const reason = e.reason;
     const msg = reason ? (reason.message || String(reason)) : "";
-    if (
-      msg.includes("AudioContext") ||
-      msg.includes("play()") ||
-      msg.includes("interrupted") ||
-      msg.includes("user didn't interact") ||
-      msg.includes("The operation was aborted")
-    ) {
-      logEvent("WARN", "AUDIO", `Audio minor warning: ${msg}`);
+    if (isNonFatal(msg)) {
+      logEvent("WARN", "ASSET_LOADER", `Non-fatal asset/network warning: ${msg}`);
       return;
     }
     showCrashModal(e.reason, "Unhandled Promise Rejection");
