@@ -1143,3 +1143,10 @@ canvas {
   opacity: 0 !important;
   pointer-events: none !important;
 }
+
+#btn-exit-return,
+#exit-return-prompt {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}

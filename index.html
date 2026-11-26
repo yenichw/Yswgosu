@@ -9,11 +9,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <link rel="icon" href="favicon.png">
   <link href="main.a37e724502caaf4a68ea.css" rel="stylesheet">
-  <link href="engine/game-ui.css?v=2.6" rel="stylesheet">
+  <link href="engine/game-ui.css?v=2.7" rel="stylesheet">
 
   <!-- Core Diagnostics & Deterministic State Machine (Must load first!) -->
-  <script src="engine/crash-logger.js?v=2.6"></script>
-  <script src="engine/state-machine.js?v=2.6"></script>
+  <script src="engine/crash-logger.js?v=2.7"></script>
+  <script src="engine/state-machine.js?v=2.7"></script>
 
   <!-- Audio Interceptor & Dynamic API Base for Local + GitHub Pages -->
   <script>
@@ -238,7 +238,7 @@
 
 
   <!-- Game and Song Select UI Container -->
-  <div id="app-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; display: none;">
+  <div id="app-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; display: flex;">
     <div id="screen-bg-image" class="screen-bg-image"></div>
     <canvas id="bg-canvas"></canvas>
 
@@ -461,15 +461,10 @@
   </div>
 
   <!-- Authentic osu! Closing Screen ("see you next time...") -->
-  <div id="exit-overlay" class="exit-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999999; flex-direction: column; align-items: center; justify-content: center; gap: 20px;">
+  <div id="exit-overlay" class="exit-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999999;">
     <div class="exit-modal">
       <div class="exit-osu-logo">osu!</div>
       <div class="exit-text">see you next time...</div>
-    </div>
-    <div id="exit-return-prompt" style="display: none; margin-top: 10px;">
-      <button id="btn-exit-return" class="btn-lazer" style="padding: 10px 24px; font-size: 0.95rem; border-radius: 20px; background: rgba(255, 255, 255, 0.12); border: 1.5px solid rgba(255, 255, 255, 0.3); color: #fff; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-        <span>↩ Return to Song Select</span>
-      </button>
     </div>
   </div>
 
@@ -676,14 +671,14 @@
 
   <!-- Local Rhythm Game Engine Scripts -->
   <script src="engine/jszip.min.js"></script>
-  <script src="engine/slider-calc.js?v=2.6"></script>
-  <script src="engine/beatmap-parser.js?v=2.6"></script>
-  <script src="engine/audio-engine.js?v=2.6"></script>
-  <script src="engine/gameplay.js?v=2.6"></script>
-  <script src="engine/renderer.js?v=2.6"></script>
-  <script src="engine/beatmap-storage.js?v=2.6"></script>
-  <script src="engine/beatmap-loader.js?v=2.6"></script>
-  <script src="engine/lazer-menu.js?v=2.6"></script>
+  <script src="engine/slider-calc.js?v=2.7"></script>
+  <script src="engine/beatmap-parser.js?v=2.7"></script>
+  <script src="engine/audio-engine.js?v=2.7"></script>
+  <script src="engine/gameplay.js?v=2.7"></script>
+  <script src="engine/renderer.js?v=2.7"></script>
+  <script src="engine/beatmap-storage.js?v=2.7"></script>
+  <script src="engine/beatmap-loader.js?v=2.7"></script>
+  <script src="engine/lazer-menu.js?v=2.7"></script>
 
   <script>
     window.addEventListener("DOMContentLoaded", async () => {
@@ -719,8 +714,6 @@
         if (isExiting) return;
         isExiting = true;
         const overlay = document.getElementById("exit-overlay");
-        const returnPrompt = document.getElementById("exit-return-prompt");
-        if (returnPrompt) returnPrompt.style.display = "none";
         if (overlay) overlay.style.display = "flex";
 
         if (window.AudioEngineInstance) {
@@ -743,22 +736,6 @@
           const exitUrl = (window.API_BASE || "") + "/api/exit";
           fetch(exitUrl).catch(() => {});
           try { window.close(); } catch (e) {}
-
-          // If browser prevented tab closure, show gentle return button
-          if (returnPrompt) {
-            returnPrompt.style.display = "block";
-            const btnReturn = document.getElementById("btn-exit-return");
-            if (btnReturn) {
-              btnReturn.onclick = () => {
-                isExiting = false;
-                if (overlay) overlay.style.display = "none";
-                if (ui && ui.screens && ui.screens.songSelect) {
-                  ui.switchScreen("songSelect");
-                  if (loader && loader.activeSet) ui.playPreview(loader.activeSet);
-                }
-              };
-            }
-          }
         }, 1200);
       };
 
