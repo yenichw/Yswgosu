@@ -184,7 +184,10 @@
     const s = String(msg).toLowerCase();
     return (
       s.includes("audiocontext") ||
-      s.includes("play()") ||
+      s.includes("play") ||
+      s.includes("not allowed") ||
+      s.includes("denied permission") ||
+      s.includes("notallowederror") ||
       s.includes("interrupted") ||
       s.includes("user didn't interact") ||
       s.includes("the operation was aborted") ||

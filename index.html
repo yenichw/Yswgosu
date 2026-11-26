@@ -9,11 +9,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <link rel="icon" href="favicon.png">
   <link href="main.a37e724502caaf4a68ea.css" rel="stylesheet">
-  <link href="engine/game-ui.css?v=3.0" rel="stylesheet">
+  <link href="engine/game-ui.css?v=3.1" rel="stylesheet">
 
   <!-- Core Diagnostics & Deterministic State Machine (Must load first!) -->
-  <script src="engine/crash-logger.js?v=3.0"></script>
-  <script src="engine/state-machine.js?v=3.0"></script>
+  <script src="engine/crash-logger.js?v=3.1"></script>
+  <script src="engine/state-machine.js?v=3.1"></script>
 
   <!-- Audio Interceptor & Dynamic API Base for Local + GitHub Pages -->
   <script>
@@ -81,6 +81,38 @@
         window.webkitAudioContext = window.AudioContext;
       }
     }
+
+        // Catch browser autoplay rejections silently and unlock on first user gesture
+    const origPlay = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function(...args) {
+      const res = origPlay.apply(this, args);
+      if (res && typeof res.catch === "function") {
+        return res.catch((err) => {
+          if (window.EngineLog) {
+            window.EngineLog.warn("AUDIO", "Browser autoplay policy prevented: " + (err ? err.message : err));
+          }
+        });
+      }
+      return res;
+    };
+
+    const unlockAudioOnGesture = () => {
+      window.allAudioContexts.forEach(ctx => {
+        try {
+          if (ctx && ctx.state === "suspended") ctx.resume();
+        } catch (e) {}
+      });
+      if (window.KosuMain && window.KosuMain.AudioEngine) {
+        try {
+          const music = window.KosuMain.AudioEngine.GetCurrentPlayingMusicNoSilent();
+          if (music && music.mediaAudioElement && music.mediaAudioElement.paused) {
+            music.mediaAudioElement.play().catch(() => {});
+          }
+        } catch (e) {}
+      }
+    };
+    window.addEventListener("pointerdown", unlockAudioOnGesture, { once: true });
+    window.addEventListener("keydown", unlockAudioOnGesture, { once: true });
 
     const origCreateElement = document.createElement;
     document.createElement = function(tag, ...args) {
@@ -665,14 +697,14 @@
 
   <!-- Local Rhythm Game Engine Scripts -->
   <script src="engine/jszip.min.js"></script>
-  <script src="engine/slider-calc.js?v=3.0"></script>
-  <script src="engine/beatmap-parser.js?v=3.0"></script>
-  <script src="engine/audio-engine.js?v=3.0"></script>
-  <script src="engine/gameplay.js?v=3.0"></script>
-  <script src="engine/renderer.js?v=3.0"></script>
-  <script src="engine/beatmap-storage.js?v=3.0"></script>
-  <script src="engine/beatmap-loader.js?v=3.0"></script>
-  <script src="engine/lazer-menu.js?v=3.0"></script>
+  <script src="engine/slider-calc.js?v=3.1"></script>
+  <script src="engine/beatmap-parser.js?v=3.1"></script>
+  <script src="engine/audio-engine.js?v=3.1"></script>
+  <script src="engine/gameplay.js?v=3.1"></script>
+  <script src="engine/renderer.js?v=3.1"></script>
+  <script src="engine/beatmap-storage.js?v=3.1"></script>
+  <script src="engine/beatmap-loader.js?v=3.1"></script>
+  <script src="engine/lazer-menu.js?v=3.1"></script>
 
   <script>
     window.addEventListener("DOMContentLoaded", async () => {
