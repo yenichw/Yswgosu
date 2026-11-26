@@ -42,6 +42,7 @@ class LazerUI {
 
     // Cached online search results
     this.currentOnlineResults = null;
+    this._currentLeadInTarget = 0;
 
     this._initParticles();
     this._bindEvents();
@@ -597,10 +598,11 @@ class LazerUI {
       const firstObj = (diff.hitObjects && diff.hitObjects[0]) ? diff.hitObjects[0] : null;
       const firstNoteTime = firstObj ? firstObj.time : 3000;
 
-      if (firstNoteTime >= 2200) {
+      if (firstNoteTime > 2500) {
         this._startWarmupLeadIn(set, diff, firstNoteTime);
       } else {
-        this.game.start();
+        this._currentLeadInTarget = 0;
+        this.game.start(0);
       }
     } catch (err) {
       if (window.EngineLog) {
@@ -611,8 +613,11 @@ class LazerUI {
 
   _startWarmupLeadIn(set, diff, firstNoteTime) {
     const leadin = document.getElementById("gameplay-leadin-overlay");
+    const targetLeadTime = Math.max(0, firstNoteTime - 1800);
+    this._currentLeadInTarget = targetLeadTime;
+
     if (!leadin) {
-      this.game.start();
+      this.game.start(targetLeadTime);
       return;
     }
 
@@ -630,7 +635,7 @@ class LazerUI {
       "💡 Tip: Alternate between Z and X keys to tap streams and fast bursts smoothly!",
       "💡 Tip: Track slider balls with your cursor or finger to maintain combo.",
       "💡 Tip: Hit circles right when the outer approach ring touches the circle border.",
-      "💡 Tip: Press Esc at any time to open the Pause menu (Resume, Retry, Song Select).",
+      "💡 Tip: Press Esc or Pause at any time to open the Pause menu.",
       "💡 Tip: On touchscreens, use multiple fingers simultaneously to hit notes!",
       "💡 Tip: Combo multipliers drastically increase your total score!",
       "💡 Tip: Clear spinners by making small, fast circular motions around the center.",
@@ -698,11 +703,11 @@ class LazerUI {
 
     leadin.style.display = "flex";
 
-    // Start music immediately (intro starts playing seamlessly)
-    this.game.start();
+    // Start playing track at 0 so player hears song intro
+    this.game.start(0);
 
-    // Lead-in countdown loop
-    const leadInDurationSec = Math.min(6, Math.max(2.2, firstNoteTime / 1000));
+    // Warmup lasts 1.8 seconds max before leaping straight into the action
+    const leadInDurationSec = 1.8;
     const startTime = performance.now();
 
     if (this._leadInInterval) clearInterval(this._leadInInterval);
@@ -714,24 +719,29 @@ class LazerUI {
         countdownEl.innerText = `Starting in ${remaining.toFixed(1)}s...`;
       }
 
-      if (remaining <= 0.3) {
-        this._skipLeadIn();
+      if (remaining <= 0.05) {
+        this._skipLeadIn(targetLeadTime);
       }
     }, 100);
 
     const btnSkip = document.getElementById("btn-leadin-skip");
     if (btnSkip) {
-      btnSkip.onclick = () => this._skipLeadIn();
+      btnSkip.onclick = () => this._skipLeadIn(targetLeadTime);
     }
   }
 
-  _skipLeadIn() {
+  _skipLeadIn(targetTime) {
     if (this._leadInInterval) {
       clearInterval(this._leadInInterval);
       this._leadInInterval = null;
     }
     const leadin = document.getElementById("gameplay-leadin-overlay");
     if (leadin) leadin.style.display = "none";
+
+    const target = targetTime !== undefined ? targetTime : this._currentLeadInTarget;
+    if (target > 0) {
+      this.game.seekTo(target);
+    }
   }
 
   togglePause(forceState) {
@@ -740,8 +750,7 @@ class LazerUI {
     const leadinOverlay = document.getElementById("gameplay-leadin-overlay");
 
     if (leadinOverlay && leadinOverlay.style.display === "flex") {
-      this._skipLeadIn();
-      return;
+      this._skipLeadIn(this._currentLeadInTarget);
     }
 
     const isCurrentlyPaused = this.game.isPaused || (pauseOverlay && pauseOverlay.style.display === "flex");
@@ -905,7 +914,10 @@ class LazerUI {
           const leadin = document.getElementById("gameplay-leadin-overlay");
           if (leadin && leadin.style.display === "flex") {
             e.preventDefault();
-            this._skipLeadIn();
+            this._skipLeadIn(this._currentLeadInTarget);
+          } else if (this._currentLeadInTarget > 0 && this.game.currentTime < this._currentLeadInTarget - 100) {
+            e.preventDefault();
+            this.game.seekTo(this._currentLeadInTarget);
           }
         }
         else if (e.code === "KeyR") {
@@ -918,16 +930,7 @@ class LazerUI {
         }
         else if (e.code === "Escape") {
           e.preventDefault();
-          const pauseOverlay = document.getElementById("gameplay-pause-overlay");
-          if (pauseOverlay && pauseOverlay.style.display === "flex") {
-            // Already in pause menu -> return to Song Select cleanly
-            pauseOverlay.style.display = "none";
-            this.game.stop();
-            this.switchScreen("songSelect");
-          } else {
-            // In gameplay -> open pause menu
-            this.togglePause();
-          }
+          this.togglePause();
         }
       });
 
@@ -940,73 +943,74 @@ class LazerUI {
       });
     }
 
+    // Unified instant action binder (prevents double trigger and ensures zero-lag mobile touch)
+    const bindAction = (el, fn) => {
+      if (!el) return;
+      let lastTrigger = 0;
+      const handler = (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        const now = performance.now();
+        if (now - lastTrigger < 350) return;
+        lastTrigger = now;
+        fn(e);
+      };
+      el.addEventListener("pointerdown", handler);
+      el.addEventListener("click", handler);
+    };
+
     // 5. In-Game Pause Overlay Bindings
     const btnPauseResume = document.getElementById("btn-pause-resume");
-    if (btnPauseResume) {
-      btnPauseResume.addEventListener("click", () => this.togglePause(false));
-    }
+    bindAction(btnPauseResume, () => this.togglePause(false));
 
     const btnPauseRetry = document.getElementById("btn-pause-retry");
-    if (btnPauseRetry) {
-      btnPauseRetry.addEventListener("click", () => {
-        const p = document.getElementById("gameplay-pause-overlay");
-        if (p) p.style.display = "none";
-        this.playCurrentBeatmap();
-      });
-    }
+    bindAction(btnPauseRetry, () => {
+      const p = document.getElementById("gameplay-pause-overlay");
+      if (p) p.style.display = "none";
+      this.playCurrentBeatmap();
+    });
 
     const btnPauseExit = document.getElementById("btn-pause-exit");
-    if (btnPauseExit) {
-      btnPauseExit.addEventListener("click", () => {
-        const p = document.getElementById("gameplay-pause-overlay");
-        if (p) p.style.display = "none";
-        this.game.stop();
-        this.switchScreen("songSelect");
-      });
-    }
+    bindAction(btnPauseExit, () => {
+      const p = document.getElementById("gameplay-pause-overlay");
+      if (p) p.style.display = "none";
+      this.game.stop();
+      this.switchScreen("songSelect");
+    });
 
     // 6. HUD Pause Button in top-left
     const pauseBtn = document.getElementById("hud-pause-btn");
-    if (pauseBtn) {
-      const handlePauseTap = (e) => {
-        if (e) { e.preventDefault(); e.stopPropagation(); }
-        this.togglePause();
-      };
-      pauseBtn.addEventListener("pointerdown", handlePauseTap);
-      pauseBtn.addEventListener("touchend", handlePauseTap);
-      pauseBtn.addEventListener("click", handlePauseTap);
-    }
+    bindAction(pauseBtn, () => this.togglePause());
+
+    // 7. HUD Skip Intro Button in bottom-right
+    const hudSkipBtn = document.getElementById("hud-skip-btn");
+    bindAction(hudSkipBtn, () => {
+      if (this._currentLeadInTarget > 0) {
+        this.game.seekTo(this._currentLeadInTarget);
+        if (hudSkipBtn) hudSkipBtn.style.display = "none";
+      }
+    });
 
     const exitBtn = document.getElementById("hud-exit-btn");
-    if (exitBtn) {
-      const triggerExit = (e) => {
-        if (e) { e.preventDefault(); e.stopPropagation(); }
-        this.game.stop();
-        this.switchScreen("songSelect");
-      };
-      exitBtn.addEventListener("pointerdown", triggerExit);
-      exitBtn.addEventListener("touchend", triggerExit);
-      exitBtn.addEventListener("click", triggerExit);
-    }
+    bindAction(exitBtn, () => {
+      this.game.stop();
+      this.switchScreen("songSelect");
+    });
 
-
-
-    // 7. Gameplay Callbacks
-        const btnFailRetry = document.getElementById("btn-fail-retry");
-    if (btnFailRetry) {
-      btnFailRetry.addEventListener("click", () => {
-        if (this.failOverlay) this.failOverlay.style.display = "none";
-        this.playCurrentBeatmap();
-      });
-    }
+    // 8. Gameplay Callbacks
+    const btnFailRetry = document.getElementById("btn-fail-retry");
+    bindAction(btnFailRetry, () => {
+      if (this.failOverlay) this.failOverlay.style.display = "none";
+      this.playCurrentBeatmap();
+    });
 
     const btnFailBack = document.getElementById("btn-fail-back");
-    if (btnFailBack) {
-      btnFailBack.addEventListener("click", () => {
-        if (this.failOverlay) this.failOverlay.style.display = "none";
-        this.switchScreen("songSelect");
-      });
-    }
+    bindAction(btnFailBack, () => {
+      if (this.failOverlay) this.failOverlay.style.display = "none";
+      this.switchScreen("songSelect");
+    });
 
     this.game.onGameFail = () => {
       if (window.FSM) window.FSM.transitionTo(GameStates.FAILED);
@@ -1091,6 +1095,14 @@ class LazerUI {
 
       if (this.game.isRunning) {
         this.game.update(delta);
+        const hudSkip = document.getElementById("hud-skip-btn");
+        if (hudSkip) {
+          if (this._currentLeadInTarget > 0 && this.game.currentTime < this._currentLeadInTarget - 200) {
+            if (hudSkip.style.display !== "flex") hudSkip.style.display = "flex";
+          } else {
+            if (hudSkip.style.display !== "none") hudSkip.style.display = "none";
+          }
+        }
       }
       if (this.screens.gameplay && this.screens.gameplay.classList.contains("active")) {
         this.renderer.render();

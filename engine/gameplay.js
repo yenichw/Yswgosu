@@ -144,12 +144,19 @@ class GameplayEngine {
     this.activeTouches.clear();
   }
 
-  start() {
+  start(startOffsetMs = 0) {
     this.resetStats();
     this.isRunning = true;
     this.isPaused = false;
     this.isFailed = false;
-    this.audio.playTrack(0);
+    this.currentTime = startOffsetMs;
+    this.audio.playTrack(startOffsetMs);
+  }
+
+  seekTo(targetTimeMs) {
+    if (!this.isRunning || this.isFailed) return;
+    this.currentTime = targetTimeMs;
+    this.audio.playTrack(targetTimeMs);
   }
 
   pause() {

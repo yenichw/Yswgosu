@@ -6,11 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <link rel="icon" href="favicon.png">
   <link href="main.a37e724502caaf4a68ea.css" rel="stylesheet">
-  <link href="engine/game-ui.css?v=2.3" rel="stylesheet">
+  <link href="engine/game-ui.css?v=2.4" rel="stylesheet">
 
   <!-- Core Diagnostics & Deterministic State Machine (Must load first!) -->
-  <script src="engine/crash-logger.js?v=2.3"></script>
-  <script src="engine/state-machine.js?v=2.3"></script>
+  <script src="engine/crash-logger.js?v=2.4"></script>
+  <script src="engine/state-machine.js?v=2.4"></script>
 
   <!-- Audio Interceptor & Dynamic API Base for Local + GitHub Pages -->
   <script>
@@ -338,8 +338,8 @@
             <div class="hud-hp-bar-container" style="width: 220px; height: 12px; background: rgba(255,255,255,0.15); border-radius: 6px; overflow: hidden; border: 1.5px solid rgba(255,255,255,0.3); box-shadow: 0 0 10px rgba(0,0,0,0.5);">
               <div class="hud-hp-fill" id="hud-hp-fill" style="width: 100%; height: 100%; background: linear-gradient(90deg, #ff1744 0%, #ffd600 50%, #00e676 100%); transition: width 0.08s linear;"></div>
             </div>
-            <button id="hud-pause-btn" style="pointer-events: auto; padding: 5px 12px; background: rgba(20,14,25,0.7); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.25); border-radius: 16px; color: #ff80ab; font-weight: 700; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.4);">
-              <span>⏸</span> <span>PAUSE</span>
+            <button id="hud-pause-btn" style="pointer-events: auto; z-index: 60; padding: 7px 16px; background: rgba(20,14,25,0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1.5px solid rgba(255,102,171,0.4); border-radius: 20px; color: #ff80ab; font-weight: 800; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 12px rgba(0,0,0,0.5); user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: transform 0.1s ease, background 0.1s ease;">
+              <span style="font-size: 0.95rem;">⏸</span> <span>PAUSE</span>
             </button>
           </div>
           <div style="display: flex; gap: 28px; align-items: baseline;">
@@ -350,6 +350,12 @@
 
         <div class="hud-bottom-left">
           <div class="combo-counter" id="hud-combo" style="font-size: 3.5rem; font-weight: 900; color: #ffd600; text-shadow: 0 0 15px rgba(255,214,0,0.6);">0x</div>
+        </div>
+
+        <div class="hud-bottom-right" style="position: absolute; bottom: 24px; right: 24px; pointer-events: none; z-index: 30;">
+          <button id="hud-skip-btn" style="display: none; pointer-events: auto; padding: 10px 22px; border-radius: 24px; background: linear-gradient(135deg, #ff66ab 0%, #aa00ff 100%); border: 1.5px solid rgba(255,255,255,0.4); color: #fff; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 0 16px rgba(255,102,171,0.6); align-items: center; gap: 8px; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: transform 0.1s ease;">
+            <span>⏩ SKIP INTRO</span> <span style="opacity: 0.8; font-size: 0.8rem;">[Space]</span>
+          </button>
         </div>
       </div>
 
@@ -666,14 +672,14 @@
 
   <!-- Local Rhythm Game Engine Scripts -->
   <script src="engine/jszip.min.js"></script>
-  <script src="engine/slider-calc.js?v=2.3"></script>
-  <script src="engine/beatmap-parser.js?v=2.3"></script>
-  <script src="engine/audio-engine.js?v=2.3"></script>
-  <script src="engine/gameplay.js?v=2.3"></script>
-  <script src="engine/renderer.js?v=2.3"></script>
-  <script src="engine/beatmap-storage.js?v=2.3"></script>
-  <script src="engine/beatmap-loader.js?v=2.3"></script>
-  <script src="engine/lazer-menu.js?v=2.3"></script>
+  <script src="engine/slider-calc.js?v=2.4"></script>
+  <script src="engine/beatmap-parser.js?v=2.4"></script>
+  <script src="engine/audio-engine.js?v=2.4"></script>
+  <script src="engine/gameplay.js?v=2.4"></script>
+  <script src="engine/renderer.js?v=2.4"></script>
+  <script src="engine/beatmap-storage.js?v=2.4"></script>
+  <script src="engine/beatmap-loader.js?v=2.4"></script>
+  <script src="engine/lazer-menu.js?v=2.4"></script>
 
   <script>
     window.addEventListener("DOMContentLoaded", async () => {
@@ -801,8 +807,14 @@
 
       window.handleAndroidBack = function() {
         if (ui && ui.screens && ui.screens.gameplay && ui.screens.gameplay.classList.contains("active")) {
-          // If on gameplay screen, open pause menu or return to song select (NEVER drop to intro osu logo!)
-          ui.togglePause();
+          const pauseOverlay = document.getElementById("gameplay-pause-overlay");
+          if (pauseOverlay && pauseOverlay.style.display === "flex") {
+            pauseOverlay.style.display = "none";
+            ui.game.stop();
+            ui.switchScreen("songSelect");
+          } else {
+            ui.togglePause();
+          }
           return;
         }
         if (container.style.display === "flex") {

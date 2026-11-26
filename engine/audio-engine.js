@@ -96,12 +96,18 @@ class AudioEngine {
     // 2. Fallback to HTML5 Audio Element if Web Audio buffer not available
     if (!this.currentSourceNode && this.currentAudioBlobUrl) {
       try {
-        this.currentAudioElement = new Audio(this.currentAudioBlobUrl);
-        this.currentAudioElement.volume = this.volumeMusic;
-        this.currentAudioElement.currentTime = startOffsetSec;
-        this.currentAudioElement.play().catch(e => {
+        const audio = new Audio(this.currentAudioBlobUrl);
+        audio.volume = this.volumeMusic;
+        if (startOffsetSec > 0) {
+          audio.addEventListener("loadedmetadata", () => {
+            try { audio.currentTime = startOffsetSec; } catch (e) {}
+          }, { once: true });
+        }
+        try { audio.currentTime = startOffsetSec; } catch (e) {}
+        audio.play().catch(e => {
           console.warn("HTML5 audio play blocked or failed:", e);
         });
+        this.currentAudioElement = audio;
       } catch (e) {
         console.warn("Failed to initialize HTML5 Audio element:", e);
       }
@@ -195,11 +201,14 @@ class AudioEngine {
       const rawAudioMs = this.currentAudioElement.currentTime * 1000;
       const monotonicMs = now - this.fallbackStartTime;
 
-      const drift = rawAudioMs - monotonicMs;
-      if (Math.abs(drift) > 50) {
-        this.fallbackStartTime = now - rawAudioMs;
+      // Only synchronize drift when HTML5 audio has actually started progressing
+      if (rawAudioMs > 0 || monotonicMs < 500) {
+        const drift = rawAudioMs - monotonicMs;
+        if (Math.abs(drift) > 80) {
+          this.fallbackStartTime = now - rawAudioMs;
+        }
       }
-      return now - this.fallbackStartTime;
+      return Math.max(0, now - this.fallbackStartTime);
     }
 
     // 3. High-resolution monotonic fallback clock
